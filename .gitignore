@@ -1,69 +1,69 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-*.so.*
-
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Build directories
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+out/
 build/
-Build/
-build-*/
-
-# CMake generated files
+cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
-install_manifest.txt
-compile_commands.json
+CTestTestfile.cmake
+_deps/
+*.dir/
 
-# Temporary files
-*.tmp
+# ---------------------------------------------------------------------------
+# Visual Studio / VS Code
+# ---------------------------------------------------------------------------
+.vs/
+.vscode/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sdf
+*.opensdf
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ---------------------------------------------------------------------------
+# Compiled binaries / object files
+# ---------------------------------------------------------------------------
+*.obj
+*.o
+*.lo
+*.slo
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.a
+*.so
+*.dylib
+
+dependencies/compiler/*.exe
+dependencies/compiler/*.dll
+
+external
+
+scripts.dll
+temp_scripts.dll
+scripts.lib
+scripts.exp
+scripts/ScriptsDLL.cpp
+scripts/*.model.cache
+assets/models/OBJCache/
+
+assets/scenes/*_temp.vrea
+start.dat
+
 *.log
-*.bak
-*.swp
+*.dmp
+*.tlog
 
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
-.cache/
+.DS_Store
+Thumbs.db
+desktop.ini
