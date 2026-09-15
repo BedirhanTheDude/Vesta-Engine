@@ -11,7 +11,7 @@ StaticPhysicsBody::StaticPhysicsBody(PhysicsWorld* world, const glm::vec3& pos,
 	std::shared_ptr<CollisionShape> shape, const glm::vec3& scale) : PhysicsBody(world, mat, shape) {
 	
 	PxPhysics* physics = world->getPhysics();
-	PxMaterial* pxMat = mat.get()->getOrCreate();
+	PxMaterial* pxMat = this->mat->getOrCreate();
 
 	PxTransform pxTransform(toPx(pos), toPx(rot));
 

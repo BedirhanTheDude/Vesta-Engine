@@ -16,7 +16,7 @@ DynamicPhysicsBody::DynamicPhysicsBody(PhysicsWorld* world, const glm::vec3& pos
 	angularDamping = 0.1f;
 
 	PxPhysics* physics = world->getPhysics();
-	PxMaterial* pxMat = mat.get()->getOrCreate();
+	PxMaterial* pxMat = this->mat->getOrCreate();
 
 	PxTransform pxTransform(toPx(pos), toPx(rot));
 
