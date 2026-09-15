@@ -1,0 +1,11 @@
+newmtl dingus
+Kd 1.0 1.0 1.0
+Ks 0.0 0.0 0.0
+Ns 1.0
+map_Kd dingus_nowhiskers.jpg
+
+newmtl whiskers
+Kd 1.0 1.0 1.0
+Ks 0.1 0.1 0.1
+Ns 16.0
+map_Kd dingus_whiskers.tga.png

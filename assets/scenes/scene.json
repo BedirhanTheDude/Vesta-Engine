@@ -1,0 +1,405 @@
+{
+    "scene": {
+        "activeCamera": "Main Camera",
+        "entities": [
+            {
+                "components": [
+                    {
+                        "aspect": 1.25,
+                        "far": 100.0,
+                        "fov": 70.0,
+                        "near": 0.10000000149011612,
+                        "type": "CameraComponent"
+                    }
+                ],
+                "name": "Main Camera",
+                "parent": "Dingus",
+                "transform": {
+                    "position": [
+                        0.0,
+                        2.0,
+                        6.000000476837158
+                    ],
+                    "rotation": [
+                        -0.0022846285719424486,
+                        0.0,
+                        0.0,
+                        0.9999973773956299
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "ambientStrength": 0.20000000298023224,
+                        "color": [
+                            1.0,
+                            0.949999988079071,
+                            0.75
+                        ],
+                        "diffuseStrength": 0.800000011920929,
+                        "shadowDistance": 30.0,
+                        "shadowFar": 200.0,
+                        "shadowNear": 0.10000000149011612,
+                        "shadowOrthoSize": 40.0,
+                        "specularStrength": 0.4000000059604645,
+                        "type": "DirectionalLightComponent"
+                    }
+                ],
+                "name": "Sun",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotation": [
+                        -0.006853766739368439,
+                        -0.004569138400256634,
+                        -3.1316871172748506e-05,
+                        0.9999660849571228
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "ambientStrength": 0.05000000074505806,
+                        "color": [
+                            1.0,
+                            0.8999999761581421,
+                            0.699999988079071
+                        ],
+                        "constant": 1.0,
+                        "diffuseStrength": 1.2000000476837158,
+                        "linear": 0.09000000357627869,
+                        "quadratic": 0.03200000151991844,
+                        "specularStrength": 1.0,
+                        "type": "PointLightComponent"
+                    },
+                    {
+                        "intensity": 1.5,
+                        "radius": 3.0,
+                        "speed": 3.0,
+                        "type": "DiscoLight"
+                    }
+                ],
+                "name": "Lamp",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        2.0,
+                        2.0,
+                        2.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "mesh": "plane",
+                        "type": "MeshComponent"
+                    },
+                    {
+                        "materials": [
+                            {
+                                "albedo": [
+                                    0.699999988079071,
+                                    0.699999988079071,
+                                    0.699999988079071
+                                ],
+                                "ambientReflectance": 1.0,
+                                "diffuseTexture": "wood.jpg",
+                                "shader": "lit",
+                                "shininess": 32.0,
+                                "specularReflectance": 0.0
+                            }
+                        ],
+                        "type": "MaterialComponent"
+                    },
+                    {
+                        "bodyType": "Kinematic",
+                        "dynamicFriction": 0.5,
+                        "forceConvex": false,
+                        "restitution": 0.009999999776482582,
+                        "staticFriction": 0.5,
+                        "type": "RigidBodyComponent"
+                    }
+                ],
+                "name": "Ground",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        0.0,
+                        -0.5,
+                        0.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "scale": [
+                        8.0,
+                        0.10000000149011612,
+                        8.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "mesh": "cube",
+                        "type": "MeshComponent"
+                    },
+                    {
+                        "materials": [
+                            {
+                                "albedo": [
+                                    1.0,
+                                    0.0,
+                                    0.20000000298023224
+                                ],
+                                "ambientReflectance": 1.0,
+                                "shader": "lit",
+                                "shininess": 32.0,
+                                "specularReflectance": 0.20000000298023224
+                            }
+                        ],
+                        "type": "MaterialComponent"
+                    },
+                    {
+                        "bodyType": "Dynamic",
+                        "dynamicFriction": 0.5,
+                        "forceConvex": false,
+                        "restitution": 0.009999999776482582,
+                        "staticFriction": 0.5,
+                        "type": "RigidBodyComponent"
+                    }
+                ],
+                "name": "Cube1",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        -1.5,
+                        5.0,
+                        0.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "mesh": "cube",
+                        "type": "MeshComponent"
+                    },
+                    {
+                        "materials": [
+                            {
+                                "albedo": [
+                                    0.0,
+                                    0.0,
+                                    1.0
+                                ],
+                                "ambientReflectance": 1.0,
+                                "shader": "lit",
+                                "shininess": 32.0,
+                                "specularReflectance": 0.20000000298023224
+                            }
+                        ],
+                        "type": "MaterialComponent"
+                    },
+                    {
+                        "bodyType": "Dynamic",
+                        "dynamicFriction": 0.5,
+                        "forceConvex": false,
+                        "restitution": 0.009999999776482582,
+                        "staticFriction": 0.5,
+                        "type": "RigidBodyComponent"
+                    }
+                ],
+                "name": "Cube2",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        1.5,
+                        0.5,
+                        0.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "mesh": "sphere",
+                        "type": "MeshComponent"
+                    },
+                    {
+                        "materials": [
+                            {
+                                "albedo": [
+                                    0.0,
+                                    0.0,
+                                    1.0
+                                ],
+                                "ambientReflectance": 1.0,
+                                "shader": "lit",
+                                "shininess": 32.0,
+                                "specularReflectance": 0.20000000298023224
+                            }
+                        ],
+                        "type": "MaterialComponent"
+                    },
+                    {
+                        "bodyType": "Dynamic",
+                        "dynamicFriction": 0.5,
+                        "forceConvex": true,
+                        "restitution": 0.009999999776482582,
+                        "staticFriction": 0.5,
+                        "type": "RigidBodyComponent"
+                    }
+                ],
+                "name": "Sphere1",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        -1.5,
+                        0.5,
+                        0.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            },
+            {
+                "components": [
+                    {
+                        "model": "maxwell.obj",
+                        "type": "MeshComponent"
+                    },
+                    {
+                        "materials": [
+                            {
+                                "albedo": [
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "ambientReflectance": 1.0,
+                                "diffuseTexture": "dingus_nowhiskers.jpg",
+                                "shader": "lit",
+                                "shininess": 1.0,
+                                "specularReflectance": 0.0
+                            },
+                            {
+                                "albedo": [
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "ambientReflectance": 1.0,
+                                "diffuseTexture": "dingus_whiskers.tga.png",
+                                "shader": "lit",
+                                "shininess": 16.0,
+                                "specularReflectance": 0.10000000149011612
+                            }
+                        ],
+                        "type": "MaterialComponent"
+                    },
+                    {
+                        "axis": [
+                            0.0,
+                            1.0,
+                            0.0
+                        ],
+                        "enabled": true,
+                        "speed": 5.0,
+                        "type": "Rotator"
+                    },
+                    {
+                        "bodyType": "Dynamic",
+                        "dynamicFriction": 0.5,
+                        "forceConvex": false,
+                        "restitution": 0.009999999776482582,
+                        "staticFriction": 0.5,
+                        "type": "RigidBodyComponent"
+                    }
+                ],
+                "name": "Dingus",
+                "parent": null,
+                "transform": {
+                    "position": [
+                        0.0,
+                        1.149999976158142,
+                        2.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "scale": [
+                        3.5,
+                        3.5,
+                        3.5
+                    ]
+                }
+            }
+        ]
+    }
+}
