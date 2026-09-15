@@ -25,7 +25,7 @@ void EditorSelectionController::selectEntityFromViewport(
     Scene* scene = Application::getCurrentScene();
     if (!scene) return;
 
-    ColourPickingRenderer& picker = getInstance().getColourPicker();
+    ColourPickingRenderer& picker = EditorSelectionController::getColourPicker();
     picker.resize((int)viewportWidth, (int)viewportHeight);
 
     picker.renderPickingPass(scene, view, projection,

@@ -6,32 +6,29 @@
 
 class Entity;
 
-class EntityController {
-	friend class ComponentController;
-	friend class TransformController;
-public:
-	static const std::set<unsigned int>& getAllEntityIDs();
-	static const std::set<unsigned int>& getEntityChildIDs(unsigned int parentID);
+namespace EntityController {
+	const std::set<unsigned int>& getAllEntityIDs();
+	const std::set<unsigned int>& getEntityChildIDs(unsigned int parentID);
 
-	static const std::map<unsigned int, unsigned int>& getComponentIdxMap(unsigned int entityID);
+	const std::map<unsigned int, unsigned int>& getComponentIdxMap(unsigned int entityID);
 
-	static void setSelectedEntityID(unsigned int ID);
-	static void setEntityParent(unsigned int childID, unsigned int parentID);
-	static void unparentEntity(unsigned int ID);
-	static void clearSelectedEntityID();
-	static void renameEntity(unsigned int ID, const char* name);
-	static void removeEntity(unsigned int ID);
+	void setSelectedEntityID(unsigned int ID);
+	void setEntityParent(unsigned int childID, unsigned int parentID);
+	void unparentEntity(unsigned int ID);
+	void clearSelectedEntityID();
+	void renameEntity(unsigned int ID, const char* name);
+	void removeEntity(unsigned int ID);
 
-	static Entity* getSelectedEntity();
-	static void setSelectedEntity(Entity* entity);
+	Entity* getSelectedEntity();
+	void setSelectedEntity(Entity* entity);
 
-	static int64_t getSelectedEntityID();
-	static std::string getEntityName(unsigned int ID);
+	int64_t getSelectedEntityID();
+	std::string getEntityName(unsigned int ID);
 
-	static bool wouldCreateCycle(unsigned int childID, unsigned int newParentID);
-	static bool entityHasParent(unsigned int childID);
-private:
-	static int64_t selectedEntityID;
+	bool wouldCreateCycle(unsigned int childID, unsigned int newParentID);
+	bool entityHasParent(unsigned int childID);
 
-	static Entity* resolveEntity(unsigned int ID);
+	inline int64_t selectedEntityID = -1;
+
+	Entity* resolveEntity(unsigned int ID);
 };

@@ -52,9 +52,9 @@ void ColourPickingRenderer::createFramebuffer(int w, int h) {
 }
 
 void ColourPickingRenderer::destroyFramebuffer() {
-	if (fbo) { glDeleteFramebuffers(1, &fbo);          fbo = 0; }
+	if (fbo) { glDeleteFramebuffers(1, &fbo); fbo = 0; }
 	if (colourTexture) { glDeleteTextures(1, &colourTexture); colourTexture = 0; }
-	if (rbo) { glDeleteRenderbuffers(1, &rbo);          rbo = 0; }
+	if (rbo) { glDeleteRenderbuffers(1, &rbo); rbo = 0; }
 }
 
 void ColourPickingRenderer::compileShader() {

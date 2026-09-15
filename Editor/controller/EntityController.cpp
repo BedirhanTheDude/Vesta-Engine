@@ -8,8 +8,6 @@
 
 #include <cstdint>
 
-int64_t EntityController::selectedEntityID = -1;
-
 const std::set<unsigned int>& EntityController::getAllEntityIDs() {
 	Scene* scene = Application::getCurrentScene();
 	return scene->getEntityIDs();
