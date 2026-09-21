@@ -17,6 +17,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <filesystem>
 #include <cstdint>
+#include <vector>
 #include <map>
 
 void EditorLayer::Init(std::function<void()> onExit) {
@@ -377,15 +378,15 @@ void EditorLayer::ShowInspectorPanel() {
 
     inspectorFocused = ImGui::IsWindowFocused();
 
-    int64_t selectedEntityID = EntityController::getSelectedEntityID();
+    Entity selectedEntity = EntityController::getSelectedEntity();
 
-    if (selectedEntityID == -1) {
+    if (!selectedEntity.isValid()) {
         ImGui::Text("No entity selected.");
         ImGui::End();
         return;
     }
 
-    unsigned int entityID = static_cast<unsigned int>(selectedEntityID);
+    unsigned int entityID = selectedEntity.getID();
 
     std::string entityName = EntityController::getEntityName(entityID);
 
@@ -403,7 +404,7 @@ void EditorLayer::ShowInspectorPanel() {
     }
     ImGui::Separator();
 
-    // Transform is special-cased: it lives on Entity directly, not in the component map.
+    // Transform is special-cased: every entity has one, it is not one of the addable/removable components.
     if (componentHeader("Transform", nullptr)) {
         glm::vec3 position = TransformController::getPosition(entityID);
         glm::vec3 rotation = TransformController::getRotation(entityID);
@@ -419,13 +420,13 @@ void EditorLayer::ShowInspectorPanel() {
             TransformController::setScale(entityID, scale);
     }
 
-    const std::map<unsigned int, unsigned int>& componentIdxMap =
-        EntityController::getComponentIdxMap(entityID);
+    // a snapshot: the list is not touched while the component widgets below are drawn
+    const std::vector<unsigned int> componentUIDs = ComponentController::getEntityComponentUIDs(entityID);
 
     unsigned int componentToRemove = 0;
     bool hasComponentToRemove = false;
 
-    for (const auto& [UID, idx] : componentIdxMap) {
+    for (unsigned int UID : componentUIDs) {
         ImGui::PushID(static_cast<int>(UID));
 
         std::string compName = ComponentController::componentUIDToString(UID);
@@ -554,9 +555,9 @@ void EditorLayer::ShowScenePanel() {
                 imageSize.x, imageSize.y, view, proj);
         }
 
-        int64_t selectedID = EntityController::getSelectedEntityID();
-        if (selectedID != -1) {
-            unsigned int entityID = static_cast<unsigned int>(selectedID);
+        Entity selectedEntity = EntityController::getSelectedEntity();
+        if (selectedEntity.isValid()) {
+            unsigned int entityID = selectedEntity.getID();
             glm::mat4 model = TransformController::getWorldMatrix(entityID);
 
             ImGuizmo::SetOrthographic(false);
@@ -598,5 +599,5 @@ void EditorLayer::ShowGamePanel() {
 }
 
 void EditorLayer::OnEntityRemoved(Entity* entity) {
-    EntityController::setSelectedEntity(nullptr);
+    EntityController::clearSelectedEntityID();
 }

@@ -5,7 +5,8 @@
 #include <functional>
 #include <cstdint>
 
-class Entity;
+#include <scene/Entity.h>
+
 class Scene;
 
 class ColourPickingRenderer {
@@ -17,7 +18,7 @@ public:
 	void beginPicking();
 	void endPicking();
 
-	using DrawCallback = std::function<void(unsigned int shader, Entity* entity, const glm::mat4& mvp)>;
+	using DrawCallback = std::function<void(unsigned int shader, const Entity& entity, const glm::mat4& mvp)>;
 
 	void renderPickingPass(
 		const Scene* scene,
@@ -26,8 +27,9 @@ public:
 		const DrawCallback& drawCallback
 	);
 
-	Entity* pickEntity(float mouseX, float mouseY) const;
-	glm::vec3 getPickedColour(Entity* entity) const;
+	// the invalid Entity (isValid() == false) if nothing was picked
+	Entity pickEntity(float mouseX, float mouseY) const;
+	glm::vec3 getPickedColour(const Entity& entity) const;
 	unsigned int getPickingShader() const { return pickingShader; }
 
 private:
@@ -40,8 +42,8 @@ private:
 	int viewportHeight = 1;
 	int savedFBO = 0;
 
-	std::unordered_map<Entity*, uint32_t> entityToId;
-	std::unordered_map<uint32_t, Entity*> idToEntity;
+	std::unordered_map<uint32_t, uint32_t> entityToId; // Entity::getID() -> picking id, rebuilt every pass
+	std::unordered_map<uint32_t, Entity> idToEntity;
 	uint32_t nextId = 1;
 
 	void createFramebuffer(int w, int h);

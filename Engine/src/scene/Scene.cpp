@@ -6,41 +6,62 @@
 #include <scene/components/DirectionalLightComponent.h>
 #include <scene/components/BehaviourComponent.h>
 #include <scene/components/RigidBodyComponent.h>
+#include <scene/components/TransformComponent.h>
+
+#include <scene/components/Transform.h>
+#include <scene/components/MeshData.h>
+#include <scene/components/RigidBody.h>
+
+#include <scene/system/TransformSystem.h>
+#include <scene/system/RigidBodySystem.h>
 
 #include <physics/PhysicsWorld.h>
 
 #include <persistance/SceneSerializer.h>
 #include <persistance/Archive.h>
 
-#include <unordered_set>
+#include <ecs/EntityHandle.h>
+#include <ecs/EntityManager.h>
+#include <ecs/ComponentPool.h>
+#include <ecs/ComponentPoolRegistry.h>
+
+#include <utility>
+#include <cassert>
+#include <cstdint>
+#include <algorithm>
+#include <stdexcept>
 
 void Scene::createDefaultScene(Scene& scene) {
 	scene.clear();
 
-	Entity& cameraEntity = scene.createEntityImmediate("Main Camera");
-	cameraEntity.transform.setPosition(glm::vec3(0, 2, 6));
-	auto& cam = cameraEntity.addComponent<CameraComponent>();
-	scene.setActiveCamera(&cam);
+	Entity cameraEntity = scene.createEntityImmediate("Main Camera");
+	cameraEntity.getTransform().setPosition(glm::vec3(0, 2, 6));
+	cameraEntity.addComponent<CameraComponent>();
+	scene.setActiveCamera(cameraEntity);
 
-	Entity& lightEntity = scene.createEntityImmediate("Directional Light");
-	lightEntity.transform.setRotation(glm::vec3(-45.0f, -45.0f, 0.0f));
-	auto& light = lightEntity.addComponent<DirectionalLightComponent>();
-	light.color = glm::vec3(1.0f);
-	light.ambientStrength = 0.2f;
-	light.diffuseStrength = 0.8f;
-	light.specularStrength = 0.5f;
+	Entity lightEntity = scene.createEntityImmediate("Directional Light");
+	lightEntity.getTransform().setRotation(glm::vec3(-45.0f, -45.0f, 0.0f));
+	auto light = lightEntity.addComponent<DirectionalLightComponent>();
+	light.setColor(glm::vec3(1.0f));
+	light.setAmbientStrength(0.2f);
+	light.setDiffuseStrength(0.8f);
+	light.setSpecularStrength(0.5f);
 }
 
 Scene::Scene(const std::string& sceneName) : sceneName(sceneName) {
 	physicsWorld = std::make_unique<PhysicsWorld>();
 	physicsWorld->init();
+
+	entityManager = std::make_unique<ECS::EntityManager>();
+	componentRegistry = std::make_unique<ECS::ComponentPoolRegistry>();
+
+	activeCameraEntityId = ECS::INVALID_ENTITY_INDEX;
+	activeCameraGeneration = ECS::INVALID_ENTITY_GENERATION;
 }
 
 Scene::~Scene() {
 	clear();
-	entities.clear();
 	physicsWorld->shutdown();
-	physicsWorld.release();
 }
 
 void Scene::newScene(const std::string& sceneName) {
@@ -57,99 +78,239 @@ void Scene::openScene(const std::string& sceneName) {
 	SceneSerializer::load(*this);
 }
 
-Entity& Scene::createEntity(const std::string& name, Entity* parent) {
-	auto entity = std::unique_ptr<Entity>(new Entity(this, name, nextEntityID, parent));
-	nextEntityID++;
-	Entity& ref = *entity;
+Entity Scene::createEntity(const std::string& name) {
+	ECS::EntityHandle handle = entityManager->create();
 
-	entitiesToAdd.push_back(std::move(entity));
-	return ref;
+	// every entity has a transform for its whole life, Entity::getTransform() relies on it
+	componentRegistry->getTransforms().add(handle);
+
+	entitiesToAdd.push_back(Entity(this, handle));
+	namesToAdd.push_back(name);
+
+	return entitiesToAdd.back();
 }
 
-Entity& Scene::createEntityImmediate(const std::string& name, Entity* parent) {
-	auto entity = std::unique_ptr<Entity>(new Entity(this, name, nextEntityID, parent));
-	nextEntityID++;
-	Entity& ref = *entity;
-	entityIDs.insert(ref.getID());
-	entities[ref.getID()] = std::move(entity);
-	return ref;
+Entity Scene::createEntity(const std::string& name, const Entity& parent) {
+	Entity entity = createEntity(name);
+	parentNewEntity(entity, parent);
+
+	return entity;
 }
 
-void Scene::removeEntity(Entity* entity) {
-	if (onEntityRemoved)
-		onEntityRemoved(entity);
-	entitiesToRemove.push_back(entity);
+Entity Scene::createEntityImmediate(const std::string& name) {
+	ECS::EntityHandle handle = entityManager->create();
 
-	for (auto child : entity->transform.getChildren()) {
-		removeEntity(child->getEntity());
+	componentRegistry->getTransforms().add(handle);
+
+	ensureSparseSize(handle);
+
+	entities.push_back(Entity(this, handle));
+	entityNames.push_back(name);
+	sparseEntities[handle] = static_cast<uint32_t>(entities.size() - 1);
+
+	return entities.back();
+}
+
+Entity Scene::createEntityImmediate(const std::string& name, const Entity& parent) {
+	Entity entity = createEntityImmediate(name);
+	parentNewEntity(entity, parent);
+
+	return entity;
+}
+
+void Scene::parentNewEntity(const Entity& child, const Entity& parent) {
+	// a parent from another scene (or a dead/invalid one) would index the wrong pools, the child stays a root
+	if (!parent.isValid() || parent.scene != this || !entityExists(parent.getHandle())) return;
+
+	Transform* transform = componentRegistry->getTransforms().get(child.getHandle());
+	if (!transform) return;
+
+	TransformSystem::setParent(*transform, child.getHandle(), parent.getHandle(), this);
+}
+
+bool Scene::tryGetEntityIndex(const ECS::EntityHandle& handle, uint32_t& outIndex) const {
+	if (handle.isInvalid() || handle >= sparseEntities.size())
+		return false;
+
+	uint32_t index = sparseEntities[handle.entityId];
+	if (index == ECS::INVALID_ENTITY_INDEX || index >= entities.size())
+		return false;
+
+	if (!(entities[index].getHandle() == handle))
+		return false;
+
+	outIndex = index;
+	return true;
+}
+
+// swap and pop to maintain dense entity vector with sparse index vector
+void Scene::swapAndPopEntity(const ECS::EntityHandle& handle) {
+	uint32_t denseIndex;
+	if (!tryGetEntityIndex(handle, denseIndex)) return;
+
+	// remove this from parent's children
+	ECS::ComponentPool<Transform>& pool = componentRegistry->getTransforms();
+	Transform* entityTransform = pool.get(handle);
+	if (entityTransform) {
+		Transform* parentTransform = pool.get(entityTransform->parent);
+		if (parentTransform)
+			TransformSystem::removeChild(*parentTransform, handle);
 	}
+
+	uint32_t last = static_cast<uint32_t>(entities.size() - 1);
+
+	if (denseIndex != last) {
+		Entity movedEntity = entities[last];
+		entities[denseIndex] = movedEntity;
+		entityNames[denseIndex] = std::move(entityNames[last]);
+
+		sparseEntities[movedEntity.entityId] = denseIndex;
+	}
+
+	entities.pop_back();
+	entityNames.pop_back();
+	sparseEntities[handle] = ECS::INVALID_ENTITY_INDEX;
+}
+
+void Scene::removeEntity(const Entity& entity) {
+	if (!entity.isValid() || entity.scene != this) return;
+
+	removeEntity(entity.getHandle());
+}
+
+void Scene::removeEntity(const ECS::EntityHandle& handle) {
+	if (!entityExists(handle)) return;
+
+	// recursively kill children
+	if (Transform* transform = componentRegistry->getTransforms().get(handle)) {
+		for (const ECS::EntityHandle& childHandle : transform->children)
+			removeEntity(childHandle);
+	}
+
+	entitiesToRemove.push_back(Entity(this, handle));
 }
 
 void Scene::removeEntity(const std::string& name) {
-	for (auto it = entities.begin(); it != entities.end(); it++) {
-		Entity* entity = it->second.get();
-		if (entity->name.compare(name) == 0) {
-			if (onEntityRemoved)
-				onEntityRemoved(entity);
-			entitiesToRemove.push_back(entity);
-
-			for (auto child : entity->transform.getChildren()) {
-				removeEntity(child->getEntity());
-			}
-
+	for (size_t i = 0; i < entities.size(); i++) {
+		if (entityNames[i] == name) {
+			/*if (onEntityRemoved)
+				onEntityRemoved(entity);*/
+			removeEntity(entities[i].getHandle());
 			return;
 		}
 	}
 }
 
-void Scene::removeEntity(unsigned int ID) {
-	auto eit = entities.find(ID);
-	if (eit != entities.end()) {
-		Entity* entity = eit->second.get();
-		if (onEntityRemoved)
-			onEntityRemoved(entity);
-		entitiesToRemove.push_back(entity);
+void Scene::removeEntity(unsigned int entityId) {
+	uint32_t generation = entityManager->getGeneration(static_cast<uint32_t>(entityId));
+	ECS::EntityHandle handle{ entityId, generation };
 
-		for (auto child : entity->transform.getChildren()) {
-			removeEntity(child->getEntity());
+	uint32_t denseIndex;
+	if (!tryGetEntityIndex(handle, denseIndex)) return; // alive in EntityManager but not yet flushed from entitiesToAdd, or genuinely gone
+
+	removeEntity(entities[denseIndex].getHandle());
+}
+
+void Scene::renameEntity(const ECS::EntityHandle& handle, const std::string& name) {
+	uint32_t denseIndex;
+	if (tryGetEntityIndex(handle, denseIndex)) {
+		entityNames[denseIndex] = name;
+		return;
+	}
+
+	// created this frame, not flushed into `entities` yet
+	for (size_t i = 0; i < entitiesToAdd.size(); i++) {
+		if (entitiesToAdd[i].getHandle() == handle) {
+			namesToAdd[i] = name;
+			return;
 		}
 	}
 }
 
-Entity* Scene::findEntity(unsigned int ID) {
-	auto eit = entities.find(ID);
-	if (eit != entities.end()) {
-		return eit->second.get();
-	}
-
-	return nullptr;
+void Scene::renameEntity(unsigned int ID, const std::string& name) {
+	ECS::EntityHandle handle{ static_cast<uint32_t>(ID), entityManager->getGeneration(static_cast<uint32_t>(ID)) };
+	renameEntity(handle, name);
 }
 
-Entity* Scene::findEntity(const std::string& name) {
-	for (auto& [ID, entity] : entities) {
-		if (entity->getName() == name)
-			return entity.get();
+std::string Scene::getEntityName(const ECS::EntityHandle& handle) const {
+	uint32_t denseIndex;
+	if (tryGetEntityIndex(handle, denseIndex))
+		return entityNames[denseIndex];
+
+	for (size_t i = 0; i < entitiesToAdd.size(); i++) {
+		if (entitiesToAdd[i].getHandle() == handle)
+			return namesToAdd[i];
 	}
-	return nullptr;
+
+	return std::string();
 }
 
-void Scene::setActiveCamera(CameraComponent* camera) {
-	if (camera) activeCamera = camera;
-	else {
-		for (auto& [ID, entity] : entities) {
-			auto cam = entity->getComponent<CameraComponent>();
-			if (cam) {
-				activeCamera = cam;
-				break;
-			}
-		}
-	}
+bool Scene::entityExists(const ECS::EntityHandle& handle) const {
+	return entityManager->isAlive(handle);
 }
 
-void Scene::onCameraAdded(CameraComponent* camera)
+bool Scene::entityExists(const Entity& entity) const {
+	return entity.isValid() && entity.scene == this && entityExists(entity.getHandle());
+}
+
+bool Scene::entityExists(unsigned int ID) const {
+	ECS::EntityHandle handle{ static_cast<uint32_t>(ID), entityManager->getGeneration(static_cast<uint32_t>(ID)) };
+
+	uint32_t denseIndex;
+	return tryGetEntityIndex(handle, denseIndex);
+}
+
+bool Scene::entityExists(const std::string& name) const {
+	for (const std::string& entityName : entityNames) {
+		if (entityName == name) return true;
+	}
+	return false;
+}
+
+Entity Scene::findEntity(const std::string& name) const {
+	for (size_t i = 0; i < entities.size(); i++) {
+		if (entityNames[i] == name) return entities[i];
+	}
+	return Entity();
+}
+
+Entity Scene::findEntity(unsigned int ID) const {
+	ECS::EntityHandle handle{ static_cast<uint32_t>(ID), entityManager->getGeneration(static_cast<uint32_t>(ID)) };
+
+	uint32_t denseIndex;
+	if (tryGetEntityIndex(handle, denseIndex))
+		return entities[denseIndex];
+
+	return Entity();
+}
+
+const std::vector<Entity>& Scene::getEntities() const {
+	return entities;
+}
+
+void Scene::setActiveCamera(const Entity& camera) {
+	ECS::EntityHandle handle = camera.getHandle();
+	activeCameraEntityId = handle.entityId;
+	activeCameraGeneration = handle.generation;
+}
+
+Entity Scene::getActiveCameraEntity() const {
+	ECS::EntityHandle handle{ activeCameraEntityId, activeCameraGeneration };
+
+	uint32_t denseIndex;
+	if (tryGetEntityIndex(handle, denseIndex))
+		return entities[denseIndex];
+
+	return Entity();
+}
+
+void Scene::onCameraAdded(const Entity& camera)
 {
-	if (activeCamera == nullptr)
-		activeCamera = camera;
+	if (!camera.isAlive()) return;
+
+	ECS::EntityHandle handle = camera.getHandle();
+	activeCameraEntityId = handle.entityId;
+	activeCameraGeneration = handle.generation;
 }
 
 void Scene::onUpdate(float dt) {
@@ -165,6 +326,7 @@ void Scene::onUpdate(float dt) {
 	physicsAccumulator += dt;
 	colliderCacheTimer += dt;
 
+	// NOTE: Maybe Scene.h is not the best place to enforce this
 	if (colliderCacheTimer > 1.0f) {
 		physicsWorld->cleanShapeCache();
 		colliderCacheTimer -= 1.0f;
@@ -173,10 +335,7 @@ void Scene::onUpdate(float dt) {
 	bool isPhysicsLoop = physicsAccumulator >= fixedPhysicsStep;
 
 	if (isPhysicsLoop)
-		for (auto& [ID, entity] : entities) {
-			auto* rb = entity->getComponent<RigidBodyComponent>();
-			if (rb) rb->pushToWorld();
-		}
+		pushRigidBodies();
 
 	while (physicsAccumulator >= fixedPhysicsStep) {
 		physicsWorld->step(fixedPhysicsStep);
@@ -184,44 +343,182 @@ void Scene::onUpdate(float dt) {
 	}
 
 	if (isPhysicsLoop)
-		for (auto& [ID, entity] : entities) {
-			auto* rb = entity->getComponent<RigidBodyComponent>();
-			if (rb) rb->pullFromWorld();
-		}
+		pullRigidBodies();
 
-	for (const auto& [ID, entity] : entities) {
-		const auto& components = entity->getComponents();
-		for (unsigned int behaviourIdx : entity->getBehaviourIndices())
-			static_cast<BehaviourComponent*>(components.at(behaviourIdx).get())->tick(dt);
+	tickBehaviours(dt);
+}
+
+void Scene::pushRigidBodies() {
+	ECS::ComponentPool<Transform>& transforms = componentRegistry->getTransforms();
+	ECS::ComponentPool<MeshData>& meshes = componentRegistry->getMeshes();
+
+	for (auto item : componentRegistry->getRigidBodies()) {
+		if (item.component.type == RigidBodyType::Static) continue; // no need to push statics
+
+		Transform* transform = transforms.get(item.entity);
+		if (!transform) continue;
+
+		RigidBodySystem::pushToWorld(item.component, *transform, meshes.get(item.entity), *physicsWorld);
+	}
+}
+
+void Scene::pullRigidBodies() {
+	ECS::ComponentPool<Transform>& transforms = componentRegistry->getTransforms();
+
+	for (auto item : componentRegistry->getRigidBodies()) {
+		if (item.component.type != RigidBodyType::Dynamic) continue; // no need to pull statics and kinematics
+
+		Transform* transform = transforms.get(item.entity);
+		if (!transform) continue;
+
+		RigidBodySystem::pullFromWorld(item.component, *transform, this);
+	}
+}
+
+void Scene::tickBehaviours(float dt) {
+	behaviourTickList.clear();
+
+	for (auto& [UID, pool] : componentRegistry->getBehaviourPools()) {
+		for (auto item : pool)
+			behaviourTickList.push_back({ UID, item.entity.entityId, item.entity.generation });
+	}
+
+	for (const BehaviourTickEntry& entry : behaviourTickList) {
+		ECS::EntityHandle handle{ entry.entityId, entry.generation };
+		if (!entityManager->isAlive(handle)) continue;
+
+		ECS::ComponentPoolRegistry::BehaviourPool* pool = componentRegistry->getBehaviourPool(entry.UID);
+		if (!pool) continue;
+
+		std::unique_ptr<BehaviourComponent>* slot = pool->get(handle);
+		if (slot && *slot)
+			(*slot)->tick(dt);
 	}
 }
 
 PhysicsWorld& Scene::getPhysicsWorld() { return *physicsWorld; }
 
+ECS::ComponentPoolRegistry* Scene::getComponentPoolRegistry() const {
+	return componentRegistry.get();
+}
+
+void Scene::addBuiltInComponent(const ECS::EntityHandle& handle, unsigned int UID) {
+	ECS::IComponentPool* pool = componentRegistry->getPool(UID);
+	if (!pool)
+		throw std::runtime_error("Unknown built-in component type");
+
+	if (!entityManager->isAlive(handle))
+		throw std::runtime_error("Cannot add a component to an entity that is not alive");
+
+	if (pool->has(handle))
+		throw std::runtime_error("Entity already has this component type");
+
+	pool->addDefault(handle);
+}
+
+bool Scene::hasComponent(const ECS::EntityHandle& handle, unsigned int UID) const {
+	if (!entityManager->isAlive(handle)) return false;
+
+	if (ECS::IComponentPool* pool = componentRegistry->getPool(UID))
+		return pool->has(handle);
+
+	if (ECS::ComponentPoolRegistry::BehaviourPool* pool = componentRegistry->getBehaviourPool(UID))
+		return pool->has(handle);
+
+	return false;
+}
+
+void Scene::removeComponent(const ECS::EntityHandle& handle, unsigned int UID) {
+	// the transform is not optional, everything else assumes every live entity has one
+	if (UID == componentTypeUID<TransformComponent>()) return;
+
+	if (ECS::IComponentPool* pool = componentRegistry->getPool(UID)) {
+		pool->remove(handle);
+		return;
+	}
+
+	if (ECS::ComponentPoolRegistry::BehaviourPool* pool = componentRegistry->getBehaviourPool(UID))
+		pool->remove(handle);
+}
+
+BehaviourComponent* Scene::addBehaviour(const ECS::EntityHandle& handle, unsigned int UID,
+	std::unique_ptr<BehaviourComponent> behaviour) {
+	// the caller keeps a raw pointer to the behaviour, so dropping it silently here would leave that dangling
+	if (!behaviour || !entityManager->isAlive(handle))
+		throw std::runtime_error("Cannot add a component to an entity that is not alive");
+
+	behaviour->entity = Entity(this, handle);
+	behaviour->typeUID = UID;
+
+	ECS::ComponentPoolRegistry::BehaviourPool& pool = componentRegistry->getOrCreateBehaviourPool(UID);
+
+	std::unique_ptr<BehaviourComponent>& slot = pool.add(handle);
+	slot = std::move(behaviour);
+
+	return slot.get();
+}
+
+BehaviourComponent* Scene::getBehaviour(const ECS::EntityHandle& handle, unsigned int UID) const {
+	ECS::ComponentPoolRegistry::BehaviourPool* pool = componentRegistry->getBehaviourPool(UID);
+	if (!pool) return nullptr;
+
+	std::unique_ptr<BehaviourComponent>* slot = pool->get(handle);
+	return slot ? slot->get() : nullptr;
+}
+
 void Scene::addNewEntities() {
-	for (auto& entity : entitiesToAdd) {
-		entityIDs.insert(entity->getID());
-		entities[entity->getID()] = std::move(entity);
+	for (size_t i = 0; i < entitiesToAdd.size(); i++) {
+		ECS::EntityHandle handle = entitiesToAdd[i].getHandle();
+
+		// removed before it was ever flushed, removeDeadEntities already destroyed it
+		if (!entityManager->isAlive(handle)) continue;
+
+		ensureSparseSize(handle);
+
+		entities.push_back(entitiesToAdd[i]);
+		entityNames.push_back(std::move(namesToAdd[i]));
+		sparseEntities[handle] = static_cast<uint32_t>(entities.size() - 1);
 	}
 	entitiesToAdd.clear();
+	namesToAdd.clear();
 }
 
 void Scene::removeDeadEntities() {
-	for (auto* dead : entitiesToRemove) {
-		auto it = entities.find(dead->getID());
-		if (it != entities.end()) {
-			entityIDs.erase(it->second->getID());
-			entities.erase(it->second->getID());
-		}
+	for (Entity& entity : entitiesToRemove) {
+		ECS::EntityHandle handle = entity.getHandle();
+
+		// duplicate request, e.g. removed explicitly and again through its parent
+		if (!entityManager->isAlive(handle)) continue;
+
+		swapAndPopEntity(handle);
+		componentRegistry->removeEntityComponents(handle);
+		entityManager->destroy(handle); // bumps the generation, every handle to this entity is stale from here on
 	}
 	entitiesToRemove.clear();
 }
 
 void Scene::clear() {
 	entities.clear();
+	entityNames.clear();
 	entitiesToAdd.clear();
+	namesToAdd.clear();
 	entitiesToRemove.clear();
-	activeCamera = nullptr;
+	sparseEntities.clear();
 
-	nextEntityID = 0;
+	// generations restart from 0 after the reset below, a stale handle here could match a brand new entity
+	activeCameraEntityId = ECS::INVALID_ENTITY_INDEX;
+	activeCameraGeneration = ECS::INVALID_ENTITY_GENERATION;
+
+	entityManager->reset(); // its OWN reset function not std::unique_ptr::reset()
+	componentRegistry->reset(); // again
+}
+
+void Scene::ensureSparseSize(const ECS::EntityHandle& handle) {
+	assert(!handle.isInvalid());
+
+	std::size_t sparseSize = sparseEntities.size();
+
+	if (handle >= static_cast<uint32_t>(sparseSize))
+		sparseEntities.resize(std::max(sparseSize * 2,
+			static_cast<std::size_t>(handle.entityId + 1)), ECS::INVALID_ENTITY_INDEX);
 }

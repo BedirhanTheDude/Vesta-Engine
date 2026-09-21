@@ -34,8 +34,6 @@ namespace {
     constexpr uint8_t  VERSION = 1;
     constexpr uint8_t  ENDIAN_LITTLE = 0; // native endian
 
-    // A parsed value. Scalars store their bytes inline in `scalar`; Object/Array
-    // recurse via children. Inline string keys live on the parent's entry map.
     struct Node {
         Tag tag = Tag::Null;
 
@@ -50,7 +48,7 @@ namespace {
         std::vector<std::shared_ptr<Node>> elements;
     };
 
-    // ---- little binary write helpers (native endian) ----
+    // little binary write helpers (native endian)
     template <typename T>
     void putPOD(std::vector<uint8_t>& buf, const T& v) {
         const auto* p = reinterpret_cast<const uint8_t*>(&v);
@@ -65,7 +63,7 @@ namespace {
         buf.insert(buf.end(), p, p + n);
     }
 
-    // ---- little binary read helpers (bounds-checked) ----
+    // little binary read helpers (bounds-checked)
     struct Reader {
         const uint8_t* p;
         const uint8_t* end;
@@ -84,9 +82,7 @@ namespace {
         uint32_t getU32() { return getPOD<uint32_t>(); }
     };
 
-    // ---------------------------------------------------------------------------
     // Serialize a Node tree -> bytes
-    // ---------------------------------------------------------------------------
     void writeValue(std::vector<uint8_t>& buf, const Node& n);
 
     void writeObjectBody(std::vector<uint8_t>& body, const Node& n) {
@@ -148,9 +144,7 @@ namespace {
         }
     }
 
-    // ---------------------------------------------------------------------------
     // Parse bytes -> Node tree
-    // ---------------------------------------------------------------------------
     std::shared_ptr<Node> readValue(Reader& r);
 
     void readObjectBody(Reader& r, Node& n) {
@@ -250,7 +244,7 @@ namespace {
         return n;
     }
 
-    // ---- scalar node builders ----
+    // scalar node builders
     template <typename T>
     std::shared_ptr<Node> makeScalar(Tag tag, const T& v) {
         auto n = std::make_shared<Node>();
@@ -277,9 +271,7 @@ namespace {
 
 } // anonymous namespace
 
-// ---------------------------------------------------------------------------
 // Impl
-// ---------------------------------------------------------------------------
 struct Archive::Impl {
     // Every archive's root is an object node.
     std::shared_ptr<Node> root = std::make_shared<Node>();
@@ -300,9 +292,7 @@ struct Archive::Impl {
     }
 };
 
-// ---------------------------------------------------------------------------
 // ctor / dtor / move
-// ---------------------------------------------------------------------------
 Archive::Archive() : impl_(new Impl()) {}
 Archive::~Archive() { delete impl_; }
 Archive::Archive(Impl* adopt) : impl_(adopt) {}
@@ -313,9 +303,7 @@ Archive& Archive::operator=(Archive&& o) noexcept {
     return *this;
 }
 
-// ---------------------------------------------------------------------------
 // buffer io
-// ---------------------------------------------------------------------------
 bool Archive::serializeToBuffer(std::string& outBytes) const {
     std::vector<uint8_t> buf;
     putBytes(buf, MAGIC, 4);
@@ -361,9 +349,7 @@ bool Archive::loadFromFile(const std::string& path) {
     return parseFromBuffer(bytes);
 }
 
-// ---------------------------------------------------------------------------
 // write scalars
-// ---------------------------------------------------------------------------
 void Archive::set(const std::string& k, int v) { impl_->put(k, makeScalar(Tag::Int, v)); }
 void Archive::set(const std::string& k, unsigned int v) { impl_->put(k, makeScalar(Tag::UInt, v)); }
 void Archive::set(const std::string& k, float v) { impl_->put(k, makeScalar(Tag::Float, v)); }
@@ -399,9 +385,7 @@ void Archive::set(const std::string& k, const glm::mat4& v) {
     n->scalar.resize(64); std::memcpy(n->scalar.data(), &v[0][0], 64); impl_->put(k, n);
 }
 
-// ---------------------------------------------------------------------------
 // write nested
-// ---------------------------------------------------------------------------
 void Archive::set(const std::string& k, Archive&& child) {
     // child's root is an Object node; adopt it directly
     impl_->put(k, child.impl_->root);
@@ -421,9 +405,7 @@ void Archive::append(const std::string& k, Archive&& child) {
     arr->elements.push_back(child.impl_->root);
 }
 
-// ---------------------------------------------------------------------------
 // read scalars
-// ---------------------------------------------------------------------------
 bool Archive::get(const std::string& k, int& out) const { return readScalar(impl_->find(k), Tag::Int, out); }
 bool Archive::get(const std::string& k, unsigned& out) const { return readScalar(impl_->find(k), Tag::UInt, out); }
 bool Archive::get(const std::string& k, float& out) const { return readScalar(impl_->find(k), Tag::Float, out); }
@@ -476,9 +458,7 @@ bool Archive::get(const std::string& k, glm::mat4& out) const {
     std::memcpy(&out[0][0], n->scalar.data(), 64); return true;
 }
 
-// ---------------------------------------------------------------------------
 // read nested
-// ---------------------------------------------------------------------------
 bool Archive::has(const std::string& k) const { return impl_->find(k) != nullptr; }
 
 Archive Archive::get(const std::string& k) const {

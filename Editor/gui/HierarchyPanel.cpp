@@ -5,14 +5,14 @@
 
 #include <imgui.h>
 
-#include <set>
+#include <vector>
 #include <string>
 #include <algorithm>
 
 const char* HierarchyPanel::DND_ID = "HIERARCHY_ENTITY";
 
 void HierarchyPanel::drawNode(unsigned int eID) {
-    std::set<unsigned int> childrenIDs = EntityController::getEntityChildIDs(eID);
+    std::vector<unsigned int> childrenIDs = EntityController::getEntityChildIDs(eID);
 
     ImGuiTreeNodeFlags flags =
         ImGuiTreeNodeFlags_OpenOnArrow |

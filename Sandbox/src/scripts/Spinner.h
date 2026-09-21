@@ -10,12 +10,11 @@ public:
     SERIALIZE(float, speed, 1.0f);
 
     void onUpdate(float dt) override {
-        Entity* entity = getEntity();
-        if (!entity) return;
+        TransformComponent transform = entity.getTransform();
 
-        glm::vec3 rotation = entity->transform.getEulerRotation();
+        glm::vec3 rotation = transform.getEulerRotation();
         rotation.y += degreesPerSecond * dt * speed;
-        entity->transform.setRotation(rotation);
+        transform.setRotation(rotation);
     }
 
 private:

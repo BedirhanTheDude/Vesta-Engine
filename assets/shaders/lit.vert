@@ -9,6 +9,8 @@ uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProj;
 
+uniform float uShadowTexelSize; // world units covered by one shadow map texel
+
 out vec3 vFragPos;
 out vec3 vNormal;
 out vec2 vTexCoord;
@@ -23,8 +25,9 @@ void main() {
 
 	vTexCoord = aTexCoord;
 
-	float normalOffsetScale = 0.02;
-	vec3 offsetPos = worldPos.xyz + vNormal * normalOffsetScale;
+	// push the shadow lookup along the normal by about a texel: a fixed distance stops being enough as soon as
+	// the shadow box grows and a texel covers more ground
+	vec3 offsetPos = worldPos.xyz + vNormal * uShadowTexelSize;
 	vFragPosLightSpace = uLightSpaceMatrix * vec4(offsetPos, 1.0);
 	gl_Position = uProj * uView * worldPos;
 }

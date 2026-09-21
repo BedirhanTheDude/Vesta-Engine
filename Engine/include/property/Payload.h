@@ -7,7 +7,7 @@
 #include <map>
 #include <unordered_set>
 
-enum class PayloadType { Mesh, Texture }; // will add new payload types later
+enum class PayloadType { Mesh, Texture }; // NOTE: will add new payload types later
 
 struct Payload {
     std::string filename;

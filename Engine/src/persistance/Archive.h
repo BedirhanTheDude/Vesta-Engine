@@ -16,8 +16,8 @@
 //   Array  : [byteLength u32][elemCount u32]   then elemCount  * Value (no keys)
 //   Entry  : [keyLen u32][keyBytes][value]
 //
-// objects/arrays are length-prefixed so unknown records can be skipped wholesale.
-// reading is parse-on-load: the whole tree is materialised in memory up front.
+// objects/arrays are length-prefixed so unknown records can be skipped wholesale
+// reading is parse-on-load: the whole tree is materialised in memory up front
 
 class Archive {
 public:

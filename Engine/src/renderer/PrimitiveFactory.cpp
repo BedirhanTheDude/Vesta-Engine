@@ -41,12 +41,12 @@ namespace PrimitiveFactory
                 int bottomRight = bottomLeft + 1;
 
                 indices.push_back(topLeft);
-                indices.push_back(bottomLeft);
                 indices.push_back(topRight);
+                indices.push_back(bottomLeft);
 
                 indices.push_back(topRight);
-                indices.push_back(bottomLeft);
                 indices.push_back(bottomRight);
+                indices.push_back(bottomLeft);
             }
         }
 
@@ -66,8 +66,8 @@ namespace PrimitiveFactory
 
         std::vector<unsigned int> indices =
         {
-            0, 1, 2,
-            2, 3, 0
+            2, 1, 0,
+            0, 3, 2
         };
 
         auto mesh = std::make_shared<Mesh>(vertices, indices);
