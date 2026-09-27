@@ -25,8 +25,8 @@ bool AssetManager::loadMesh(const std::string& name) {
         mesh = PrimitiveFactory::createCube();
     else if (name == "sphere")
         mesh = PrimitiveFactory::createSphere();
-    else if (name == "plane")
-        mesh = PrimitiveFactory::createPlane();
+    else if (name == "quad")
+        mesh = PrimitiveFactory::createQuad();
     else
         mesh = ObjLoader::load(name);
 

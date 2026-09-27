@@ -394,6 +394,18 @@ void Scene::tickBehaviours(float dt) {
 		if (slot && *slot)
 			(*slot)->tick(dt);
 	}
+
+	for (const BehaviourTickEntry& entry : behaviourTickList) {
+		ECS::EntityHandle handle{ entry.entityId, entry.generation };
+		if (!entityManager->isAlive(handle)) continue;
+
+		ECS::ComponentPoolRegistry::BehaviourPool* pool = componentRegistry->getBehaviourPool(entry.UID);
+		if (!pool) continue;
+
+		std::unique_ptr<BehaviourComponent>* slot = pool->get(handle);
+		if (slot && *slot && (*slot)->started)
+			(*slot)->onLateUpdate(dt);
+	}
 }
 
 PhysicsWorld& Scene::getPhysicsWorld() { return *physicsWorld; }

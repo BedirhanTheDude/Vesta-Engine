@@ -11,7 +11,7 @@
 namespace MeshSystem {
 
     static const std::vector<const char*>& primitiveNames() {
-        static const std::vector<const char*> names = { "none", "cube", "sphere", "plane" };
+        static const std::vector<const char*> names = { "none", "cube", "sphere", "quad" };
         return names;
     }
 

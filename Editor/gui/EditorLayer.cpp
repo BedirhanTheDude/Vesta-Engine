@@ -501,6 +501,7 @@ void EditorLayer::ShowInspectorPanel() {
     ImGui::End();
 }
 
+// this is currently useless
 void EditorLayer::ShowConsolePanel() {
     ImGui::Begin("Console", &showConsole);
 

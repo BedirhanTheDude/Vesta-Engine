@@ -77,7 +77,7 @@ namespace {
 		MeshData* data = resolveComponent<MeshData>(entity);
 		if (!data) return false;
 
-		static const std::vector<const char*> primitiveNames = { "none", "cube", "sphere", "plane" };
+		static const std::vector<const char*> primitiveNames = { "none", "cube", "sphere", "quad" };
 
 		// picking a primitive swaps the mesh, so it goes through the component instead of writing the field
 		auto primitiveCallback = [entity](const void* ptr) {
