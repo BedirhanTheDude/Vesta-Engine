@@ -10,8 +10,6 @@ std::unique_ptr<Scene> Application::scene;
 std::unique_ptr<Renderer> Application::renderer;
 
 Scene* Application::newScene(const std::string& name) {
-	// Scene's ctor is private with Application as friend; make_unique isn't the friend,
-	// so construct directly and adopt into the unique_ptr.
 	scene = std::unique_ptr<Scene>(new Scene(name));
 
 	bool loaded = SceneSerializer::load(*scene, false);

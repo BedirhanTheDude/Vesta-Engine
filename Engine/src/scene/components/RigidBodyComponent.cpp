@@ -5,357 +5,229 @@
 #include <scene/Entity.h>
 #include <scene/Scene.h>
 #include <scene/components/ComponentFactory.h>
-#include <scene/components/MeshComponent.h>
-#include <renderer/Mesh.h>
+
+#include <scene/components/RigidBody.h>
+#include <scene/components/Transform.h>
+#include <scene/components/MeshData.h>
+#include <scene/components/ProxyUtil.h>
+#include <scene/system/RigidBodySystem.h>
 
 #include <physics/PhysicsWorld.h>
 #include <physics/PhysicsMaterial.h>
 #include <physics/CollisionShape.h>
-#include <physics/body/PhysicsBody.h>
-#include <physics/body/StaticPhysicsBody.h>
-#include <physics/body/DynamicPhysicsBody.h>
 
-RigidBodyComponent::RigidBodyComponent(RigidBodyType type,
-    std::shared_ptr<PhysicsMaterial> material,
-    std::shared_ptr<CollisionShape> shape,
-    bool forceConvex)
-    : forceConvex(forceConvex), type(type), material(material), shape(shape) {
-}
+// everything the physics solver needs from the entity's other components, mesh is null if it has none
+struct RigidBodyContext {
+    RigidBody* rb;
+    Transform* transform;
+    MeshData* mesh;
+    PhysicsWorld* world;
+};
 
-RigidBodyComponent::~RigidBodyComponent() = default;
+static bool resolveContext(const Entity& entity, RigidBodyContext& context) {
+    context.rb = resolveComponent<RigidBody>(entity);
+    context.transform = resolveComponent<Transform>(entity);
+    if (!context.rb || !context.transform) return false;
 
-bool RigidBodyComponent::onAttach() {
-    if (owner->getTransform().getParent() != nullptr) {
-        printf("Warning: RigidBodyComponent not supported on child entities.\n");
-        return false;
-    }
-
-    if (!material)
-        material = std::make_shared<PhysicsMaterial>();
-
-    PhysicsWorld& world = owner->getScene().getPhysicsWorld();
-    glm::vec3 pos = owner->transform.getPosition();
-    glm::quat rot = owner->transform.getRotationQuat();
-
-    glm::vec3 scale = owner->transform.getScale();
-    lastScale = scale;
-
-    if (!shape) {
-        auto* mc = owner->getComponent<MeshComponent>();
-        if (mc && mc->getMesh()) {
-            if (useTriangleMesh)
-                shape = std::make_shared<CollisionShape>(
-                    CollisionShape::triangleMesh(
-                        mc->getMesh()->getVertices(),
-                        mc->getMesh()->getIndices()));
-            else
-                shape = world.getOrCreateShape(mc->getMesh(), scale, forceConvex);
-        }
-        else {
-            shape = std::make_shared<CollisionShape>(
-                CollisionShape::boxMesh(owner->transform.getScale() * 0.5f));
-        }
-    }
-
-    if (type == RigidBodyType::Static) {
-        body = std::make_unique<StaticPhysicsBody>(&world, pos, rot, material, shape, scale);
-    }
-    else if (type == RigidBodyType::Dynamic) {
-        body = std::make_unique<DynamicPhysicsBody>(&world, pos, rot, material, shape, scale);
-    }
-    else if (type == RigidBodyType::Kinematic) {
-        body = std::make_unique<DynamicPhysicsBody>(&world, pos, rot, material, shape, scale, true);
-    }
-
-    owner->getTransform().onBeforeReparent = []() {
-        printf("Warning: Cannot reparent entity with RigidBodyComponent.\n");
-        return false;
-        };
-
-    registerProperties();
+    context.mesh = resolveComponent<MeshData>(entity);
+    context.world = &entity.getScene().getPhysicsWorld();
 
     return true;
 }
 
+void RigidBodyComponent::init(RigidBodyType type,
+    std::shared_ptr<PhysicsMaterial> material,
+    std::shared_ptr<CollisionShape> shape,
+    bool forceConvex) {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    if (!rb) return;
+
+    rb->type = type;
+    rb->material = std::move(material);
+    rb->shape = std::move(shape);
+    rb->forceConvex = forceConvex;
+}
+
+bool RigidBodyComponent::onAttach() {
+    RigidBodyContext context;
+    if (!resolveContext(entity, context)) return false;
+
+    return RigidBodySystem::attach(*context.rb, *context.transform, context.mesh, *context.world);
+}
+
 void RigidBodyComponent::onDetach() {
-    body.reset();
-
-    owner->getTransform().onBeforeReparent = nullptr;
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::detach(*rb);
 }
-
-void RigidBodyComponent::pushToWorld() {
-    glm::vec3 currentScale = owner->transform.getScale();
-
-    if (currentScale != lastScale) {
-        lastScale = currentScale;
-        recookShape();
-    }
-
-    glm::vec3 pos = owner->transform.getPosition();
-    glm::quat rot = owner->transform.getRotationQuat();
-
-    if (type == RigidBodyType::Dynamic) {
-        bool wake = owner->transform.physicsDirty;
-        static_cast<DynamicPhysicsBody*>(body.get())->setGlobalPose(pos, rot, wake);
-    }
-    else if (type == RigidBodyType::Kinematic) {
-        static_cast<DynamicPhysicsBody*>(body.get())->setKinematicTarget(pos, rot);
-    }
-}
-
-void RigidBodyComponent::pullFromWorld() {
-    if (type == RigidBodyType::Dynamic) {
-        owner->transform.setPosition(body->getPosition());
-        owner->transform.setRotation(body->getRotation());
-    }
-    owner->transform.physicsDirty = false;
-}
-
-void RigidBodyComponent::recookShape() {
-    body->clearShapes();
-
-    auto* mc = owner->getComponent<MeshComponent>();
-    if (mc && mc->getMesh()) {
-        PhysicsWorld& world = owner->getScene().getPhysicsWorld();
-        shape = world.getOrCreateShape(mc->getMesh(), owner->transform.getScale(), forceConvex);
-    }
-
-    body->attachShape(shape, owner->transform.getScale());
-}
-
-// This is HEAVY
-void RigidBodyComponent::rebuild() {
-    body.reset();
-    onAttach();
-}
-
-void RigidBodyComponent::setType(RigidBodyType newType) {
-    if (newType == type) return;
-    type = newType;
-    rebuild();
-}
-
-void RigidBodyComponent::setForceConvex(bool value) {
-    if (forceConvex == value) return;
-    forceConvex = value;
-    recookShape();
-}
-
-void RigidBodyComponent::setUseTriangleMesh(bool value) {
-    if (useTriangleMesh == value) return;
-    useTriangleMesh = value;
-    recookShape();
-}
-
-void RigidBodyComponent::setGlobalPose(const glm::vec3& pos, const glm::quat& rot, bool autowake) {
-    if (type == RigidBodyType::Static) {
-        if (auto* stat = static_cast<StaticPhysicsBody*>(body.get()))
-            stat->setGlobalPose(pos, rot);
-    }
-    else {
-        if (auto* dyn = static_cast<DynamicPhysicsBody*>(body.get()))
-            dyn->setGlobalPose(pos, rot, autowake);
-    }
-}
-
-void RigidBodyComponent::setKinematicTarget(const glm::vec3& pos, const glm::quat& rot) {
-    if (type != RigidBodyType::Kinematic) return;
-    if (auto* dyn = static_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->setKinematicTarget(pos, rot);
-}
-
-void RigidBodyComponent::addForce(const glm::vec3& force) {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->addForce(force);
-}
-
-void RigidBodyComponent::addForceAtPosition(const glm::vec3& force, const glm::vec3& worldPos) {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->addForceAtPosition(force, worldPos);
-}
-
-void RigidBodyComponent::addForceAtLocalPosition(const glm::vec3& force, const glm::vec3& localPos) {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->addForceAtLocalPosition(force, localPos);
-}
-
-void RigidBodyComponent::addImpulse(const glm::vec3& impulse) {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->addImpulse(impulse);
-}
-
-void RigidBodyComponent::setLinearVelocity(const glm::vec3& v) {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->setLinearVelocity(v);
-}
-
-glm::vec3 RigidBodyComponent::getLinearVelocity() const {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        return dyn->getLinearVelocity();
-    return glm::vec3(0.0f);
-}
-
-void RigidBodyComponent::setAngularVelocity(const glm::vec3& v) {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        dyn->setAngularVelocity(v);
-}
-
-glm::vec3 RigidBodyComponent::getAngularVelocity() const {
-    if (auto* dyn = dynamic_cast<DynamicPhysicsBody*>(body.get()))
-        return dyn->getAngularVelocity();
-    return glm::vec3(0.0f);
-}
-
-void RigidBodyComponent::setLinearDamping(float damping) {
-    auto* dynamicBody = dynamic_cast<DynamicPhysicsBody*>(body.get());
-    if (dynamicBody) {
-        dynamicBody->setLinearDamping(damping);
-    }
-}
-
-void RigidBodyComponent::setAngularDamping(float damping) {
-    auto* dynamicBody = dynamic_cast<DynamicPhysicsBody*>(body.get());
-    if (dynamicBody) {
-        dynamicBody->setAngularDamping(damping);
-    }
-}
-
-glm::vec3 RigidBodyComponent::getWorldPosition() const {
-    if (!body) return glm::vec3(0.0f);
-    return body->getPosition();
-}
-
-glm::quat RigidBodyComponent::getWorldRotation() const {
-    if (!body) return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-    return body->getRotation();
-}
-
-void RigidBodyComponent::setStaticFriction(float f) {
-    if (!material) material = std::make_shared<PhysicsMaterial>(f, 0.5f, 0.01f);
-    else material->setStaticFriction(f);
-}
-
-void RigidBodyComponent::setDynamicFriction(float f) {
-    if (!material) material = std::make_shared<PhysicsMaterial>(0.5f, f, 0.01f);
-    else material->setDynamicFriction(f);
-}
-
-void RigidBodyComponent::setRestitution(float r) {
-    if (!material) material = std::make_shared<PhysicsMaterial>(0.5f, 0.5f, r);
-    else material->setRestitution(r);
-}
-
-float RigidBodyComponent::getStaticFriction() const {
-    return material ? material->staticFriction : 0.5f;
-}
-
-float RigidBodyComponent::getDynamicFriction() const {
-    return material ? material->dynamicFriction : 0.5f;
-}
-
-float RigidBodyComponent::getRestitution() const {
-    return material ? material->restitution : 0.01f;
-}
-
-std::shared_ptr<PhysicsMaterial> RigidBodyComponent::getMaterial() const { return material; }
 
 void RigidBodyComponent::serialize(Archive& arch) const {
-    switch (type) {
-    case Static:    arch.set("bodyType", std::string("Static")); break;
-    case Dynamic:   arch.set("bodyType", std::string("Dynamic")); break;
-    case Kinematic: arch.set("bodyType", std::string("Kinematic")); break;
-    }
-    arch.set("forceConvex", forceConvex);
-
-    if (shape) {
-        switch (shape->getType()) {
-        case CollisionShapeType::TriangleMesh: arch.set("shapeType", std::string("Triangle")); break;
-        case CollisionShapeType::ConvexMesh:   arch.set("shapeType", std::string("Convex")); break;
-        case CollisionShapeType::BoxMesh:      arch.set("shapeType", std::string("Box")); break;
-        case CollisionShapeType::SphereMesh:   arch.set("shapeType", std::string("Sphere")); break;
-        }
-    }
-
-    if (material) {
-        arch.set("staticFriction", material->staticFriction);
-        arch.set("dynamicFriction", material->dynamicFriction);
-        arch.set("restitution", material->restitution);
-    }
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::serialize(*rb, arch);
 }
 
 void RigidBodyComponent::deserialize(const Archive& arch) {
-    std::string bt;
-    if (!arch.get("bodyType", bt)) bt = "Dynamic";
-    if (bt == "Static") type = Static;
-    else if (bt == "Kinematic") type = Kinematic;
-    else type = Dynamic;
-
-    if (!arch.get("forceConvex", forceConvex)) forceConvex = false;
-
-    std::string shapeType;
-    if (!arch.get("shapeType", shapeType)) shapeType = "Box";
-    if (shapeType == "Triangle") {
-        useTriangleMesh = true;
-    }
-
-    if (arch.has("staticFriction")) {
-        float sf, df, rest;
-        if (!arch.get("staticFriction", sf)) sf = 0.5f;
-        if (!arch.get("dynamicFriction", df)) df = 0.5f;
-        if (!arch.get("restitution", rest)) rest = 0.01f;
-        material = std::make_shared<PhysicsMaterial>(sf, df, rest);
-    }
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::deserialize(*rb, arch);
 }
 
-void RigidBodyComponent::registerProperties() {
-    auto typeCallback = [this](const void* ptr) {
-        RigidBodyType type = *static_cast<const RigidBodyType*>(ptr);
-        setType(type);
-        };
+RigidBodyType RigidBodyComponent::getType() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? rb->type : Dynamic;
+}
 
-    auto convexCallback = [this](const void* ptr) {
-        bool convex = *static_cast<const bool*>(ptr);
-        setForceConvex(convex);
-        };
+void RigidBodyComponent::setType(RigidBodyType newType) {
+    RigidBodyContext context;
+    if (!resolveContext(entity, context)) return;
 
-    auto triangleCallback = [this](const void* ptr) {
-        bool triangle = *static_cast<const bool*>(ptr);
-        setUseTriangleMesh(triangle);
-        };
+    if (newType == context.rb->type) return;
+    context.rb->type = newType;
 
-    auto linearDampingCallback = [this](const void* ptr) {
-        float linearDamping = *static_cast<const float*>(ptr);
-        setLinearDamping(linearDamping);
-        };
+    RigidBodySystem::rebuild(*context.rb, *context.transform, context.mesh, *context.world);
+}
 
-    auto angularDampingCallback = [this](const void* ptr) {
-        float angularDamping = *static_cast<const float*>(ptr);
-        setAngularDamping(angularDamping);
-        };
+bool RigidBodyComponent::getForceConvex() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? rb->forceConvex : false;
+}
 
-    auto dynamicFrictionCallback = [this](const void* ptr) {
-        float friction = *static_cast<const float*>(ptr);
-        setDynamicFriction(friction);
-        };
+void RigidBodyComponent::setForceConvex(bool value) {
+    RigidBodyContext context;
+    if (!resolveContext(entity, context)) return;
 
-    auto staticFrictionCallback = [this](const void* ptr) {
-        float friction = *static_cast<const float*>(ptr);
-        setStaticFriction(friction);
-        };
+    if (context.rb->forceConvex == value) return;
+    context.rb->forceConvex = value;
 
-    auto restitutionCallback = [this](const void* ptr) {
-        float res = *static_cast<const float*>(ptr);
-        setRestitution(res);
-        };
+    RigidBodySystem::recookShape(*context.rb, *context.transform, context.mesh, *context.world);
+}
 
-    registerCallback("Body Type", CallbackPropertyType::Enum, &this->type, RigidBodyType_t::values(), typeCallback);
-    registerCallback("Force Convex", CallbackPropertyType::Bool, &this->forceConvex, convexCallback);
-    registerCallback("Use Triangle Mesh", CallbackPropertyType::Bool, &useTriangleMesh, triangleCallback);
-    registerCallback("Linear Damping", CallbackPropertyType::Float, &linearDamping, linearDampingCallback);
-    registerCallback("Angular Damping", CallbackPropertyType::Float, &angularDamping, angularDampingCallback);
-    registerCallback("Dynamic Friction", CallbackPropertyType::Float, &material->dynamicFriction, dynamicFrictionCallback);
-    registerCallback("Static Friction", CallbackPropertyType::Float, &material->staticFriction, staticFrictionCallback);
-    registerCallback("Restitution", CallbackPropertyType::Float, &material->restitution, restitutionCallback);
+bool RigidBodyComponent::getUseTriangleMesh() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? rb->useTriangleMesh : false;
+}
+
+void RigidBodyComponent::setUseTriangleMesh(bool value) {
+    RigidBodyContext context;
+    if (!resolveContext(entity, context)) return;
+
+    if (context.rb->useTriangleMesh == value) return;
+    context.rb->useTriangleMesh = value;
+
+    RigidBodySystem::recookShape(*context.rb, *context.transform, context.mesh, *context.world);
+}
+
+void RigidBodyComponent::setGlobalPose(const glm::vec3& pos, const glm::quat& rot, bool autowake) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setGlobalPose(*rb, pos, rot, autowake);
+}
+
+void RigidBodyComponent::setKinematicTarget(const glm::vec3& pos, const glm::quat& rot) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setKinematicTarget(*rb, pos, rot);
+}
+
+void RigidBodyComponent::addForce(const glm::vec3& force) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::addForce(*rb, force);
+}
+
+void RigidBodyComponent::addForceAtPosition(const glm::vec3& force, const glm::vec3& worldPos) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::addForceAtPosition(*rb, force, worldPos);
+}
+
+void RigidBodyComponent::addForceAtLocalPosition(const glm::vec3& force, const glm::vec3& localPos) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::addForceAtLocalPosition(*rb, force, localPos);
+}
+
+void RigidBodyComponent::addImpulse(const glm::vec3& impulse) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::addImpulse(*rb, impulse);
+}
+
+void RigidBodyComponent::setLinearVelocity(const glm::vec3& v) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setLinearVelocity(*rb, v);
+}
+
+glm::vec3 RigidBodyComponent::getLinearVelocity() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getLinearVelocity(*rb) : glm::vec3(0.0f);
+}
+
+void RigidBodyComponent::setAngularVelocity(const glm::vec3& v) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setAngularVelocity(*rb, v);
+}
+
+glm::vec3 RigidBodyComponent::getAngularVelocity() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getAngularVelocity(*rb) : glm::vec3(0.0f);
+}
+
+void RigidBodyComponent::setLinearDamping(float damping) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setLinearDamping(*rb, damping);
+}
+
+void RigidBodyComponent::setAngularDamping(float damping) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setAngularDamping(*rb, damping);
+}
+
+float RigidBodyComponent::getLinearDamping() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? rb->linearDamping : 0.2f;
+}
+
+float RigidBodyComponent::getAngularDamping() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? rb->angularDamping : 0.1f;
+}
+
+glm::vec3 RigidBodyComponent::getWorldPosition() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getWorldPosition(*rb) : glm::vec3(0.0f);
+}
+
+glm::quat RigidBodyComponent::getWorldRotation() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getWorldRotation(*rb) : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+}
+
+void RigidBodyComponent::setStaticFriction(float f) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setStaticFriction(*rb, f);
+}
+
+void RigidBodyComponent::setDynamicFriction(float f) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setDynamicFriction(*rb, f);
+}
+
+void RigidBodyComponent::setRestitution(float r) {
+    if (RigidBody* rb = resolveComponent<RigidBody>(entity))
+        RigidBodySystem::setRestitution(*rb, r);
+}
+
+float RigidBodyComponent::getStaticFriction() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getStaticFriction(*rb) : 0.5f;
+}
+
+float RigidBodyComponent::getDynamicFriction() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getDynamicFriction(*rb) : 0.5f;
+}
+
+float RigidBodyComponent::getRestitution() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? RigidBodySystem::getRestitution(*rb) : 0.01f;
+}
+
+std::shared_ptr<PhysicsMaterial> RigidBodyComponent::getMaterial() const {
+    RigidBody* rb = resolveComponent<RigidBody>(entity);
+    return rb ? rb->material : nullptr;
 }
 
 REGISTER(RigidBodyComponent);

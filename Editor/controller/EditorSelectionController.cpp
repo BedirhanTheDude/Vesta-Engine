@@ -29,16 +29,17 @@ void EditorSelectionController::selectEntityFromViewport(
     picker.resize((int)viewportWidth, (int)viewportHeight);
 
     picker.renderPickingPass(scene, view, projection,
-        [&picker](unsigned int shader, Entity* entity, const glm::mat4& mvp) {
+        [&picker](unsigned int shader, const Entity& entity, const glm::mat4& mvp) {
             glUseProgram(shader);
             glUniformMatrix4fv(glGetUniformLocation(shader, "uMVP"), 1, GL_FALSE, glm::value_ptr(mvp));
             glm::vec3 colour = picker.getPickedColour(entity);
             glUniform3fv(glGetUniformLocation(shader, "uColour"), 1, glm::value_ptr(colour));
 
-            MeshComponent* mc = entity->getComponent<MeshComponent>();
+            auto mc = entity.getComponent<MeshComponent>();
             if (mc && mc->getMesh()) mc->getMesh()->draw();
         });
 
-    Entity* clicked = picker.pickEntity(mouseX, mouseY);
+    // clicking empty space picks the invalid Entity, which clears the selection
+    Entity clicked = picker.pickEntity(mouseX, mouseY);
     EntityController::setSelectedEntity(clicked);
 }

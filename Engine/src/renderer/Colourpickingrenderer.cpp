@@ -2,7 +2,11 @@
 #include <glad/glad.h>
 #include <scene/Scene.h>
 #include <scene/Entity.h>
-#include <scene/components/MeshComponent.h>
+#include <scene/components/Transform.h>
+#include <scene/components/MeshData.h>
+#include <scene/system/TransformSystem.h>
+#include <ecs/ComponentPool.h>
+#include <ecs/ComponentPoolRegistry.h>
 #include <cstdio>
 
 ColourPickingRenderer::ColourPickingRenderer() {
@@ -97,17 +101,15 @@ void ColourPickingRenderer::buildEntityMap(const Scene* scene) {
 	idToEntity.clear();
 	if (!scene) return;
 	uint32_t id = 1;
-	for (auto& [eID, ePtr] : scene->getEntities()) {
-		Entity* e = ePtr.get();
-		if (!e) continue;
-		entityToId[e] = id;
+	for (const Entity& e : scene->getEntities()) {
+		entityToId[e.getID()] = id;
 		idToEntity[id] = e;
 		++id;
 	}
 }
 
-glm::vec3 ColourPickingRenderer::getPickedColour(Entity* entity) const {
-	auto it = entityToId.find(entity);
+glm::vec3 ColourPickingRenderer::getPickedColour(const Entity& entity) const {
+	auto it = entityToId.find(entity.getID());
 	if (it == entityToId.end())
 		return glm::vec3(0.0f);
 	return idToColour(it->second);
@@ -133,17 +135,26 @@ void ColourPickingRenderer::renderPickingPass(
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 
-	for (auto& [eID, ePtr] : scene->getEntities()) {
-		Entity* e = ePtr.get();
-		if (!e) continue;
+	// picking only reads the scene, the transforms' lazily cached (mutable) matrices are all it refreshes
+	Scene* mutableScene = const_cast<Scene*>(scene);
 
-		auto* mc = e->getComponent<MeshComponent>();
-		if (!mc || !mc->getMesh()) continue;
+	ECS::ComponentPoolRegistry* registry = scene->getComponentPoolRegistry();
+	ECS::ComponentPool<Transform>& transforms = registry->getTransforms();
 
-		glm::mat4 model = e->transform.getMatrix();
+	for (auto item : registry->getMeshes()) {
+		if (!item.component.mesh) continue;
+
+		// entities created this frame are not flushed yet, so they are not in the map either
+		auto it = entityToId.find(item.entity.entityId);
+		if (it == entityToId.end()) continue;
+
+		Transform* transform = transforms.get(item.entity);
+		if (!transform) continue;
+
+		glm::mat4 model = TransformSystem::getMatrix(*transform, mutableScene);
 		glm::mat4 mvp = projection * view * model;
 
-		drawCallback(pickingShader, e, mvp);
+		drawCallback(pickingShader, idToEntity[it->second], mvp);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
@@ -167,14 +178,14 @@ void ColourPickingRenderer::endPicking() {
 	glEnable(GL_BLEND);
 }
 
-Entity* ColourPickingRenderer::pickEntity(float mouseX, float mouseY) const {
-	if (!fbo) return nullptr;
+Entity ColourPickingRenderer::pickEntity(float mouseX, float mouseY) const {
+	if (!fbo) return Entity();
 
 	int x = static_cast<int>(mouseX);
 	int y = viewportHeight - 1 - static_cast<int>(mouseY);
 
 	if (x < 0 || x >= viewportWidth || y < 0 || y >= viewportHeight)
-		return nullptr;
+		return Entity();
 
 	GLint previousFBO = 0;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
@@ -189,10 +200,10 @@ Entity* ColourPickingRenderer::pickEntity(float mouseX, float mouseY) const {
 
 	uint32_t id = colourtoId(pixel[0], pixel[1], pixel[2]);
 	if (id == 0)
-		return nullptr;
+		return Entity();
 
 	auto it = idToEntity.find(id);
 	if (it == idToEntity.end())
-		return nullptr;
+		return Entity();
 	return it->second;
 }

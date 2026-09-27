@@ -1,21 +1,34 @@
 #include "Renderer.h"
 
 #include <memory>
+#include <vector>
+#include <algorithm>
 
 #include <scene/Scene.h>
 #include <scene/Entity.h>
-#include <scene/components/TransformComponent.h>
-#include <scene/components/MeshComponent.h>
-#include <scene/components/MaterialComponent.h>
-#include <scene/components/CameraComponent.h>
-#include <scene/components/DirectionalLightComponent.h>
-#include <scene/components/PointLightComponent.h>
+
+#include <scene/components/Transform.h>
+#include <scene/components/Camera.h>
+#include <scene/components/MeshData.h>
+#include <scene/components/MaterialData.h>
+#include <scene/components/DirectionalLight.h>
+#include <scene/components/PointLight.h>
+
+#include <scene/system/TransformSystem.h>
+#include <scene/system/CameraSystem.h>
+#include <scene/system/DirectionalLightSystem.h>
+
+#include <ecs/EntityHandle.h>
+#include <ecs/ComponentPool.h>
+#include <ecs/ComponentPoolRegistry.h>
 
 #include <renderer/ShaderProgram.h>
 #include <renderer/Mesh.h>
 #include <renderer/Material.h>
 
 #include <glad/glad.h>
+
+#include <cstdint>
 
 
 // DO NOT change order of this struct pls, memory alignment may break
@@ -30,35 +43,69 @@ struct PointLightGPU {
 	float quadratic;
 };
 
-static std::vector<PointLightGPU> buildPointLightBuffer(
-	const std::vector<PointLightComponent*>& pointLightComponents) {
-	std::vector<PointLightGPU> gpuBuffer;
-
-	for (auto* plComp : pointLightComponents) {
-		PointLightGPU pointLight;
-		pointLight.position = plComp->getEntity()->transform.getPosition();
-		pointLight.ambientIntensity = plComp->ambientStrength;
-		pointLight.color = plComp->color;
-		pointLight.diffuseIntensity = plComp->diffuseStrength;
-		pointLight.specularIntensity = plComp->specularStrength;
-		pointLight.constant = plComp->constant;
-		pointLight.linear = plComp->linear;
-		pointLight.quadratic = plComp->quadratic;
-
-		gpuBuffer.push_back(pointLight);
-	}
-
-	return gpuBuffer;
-}
-
-static bool hasAnyTransparent(const MaterialComponent* matc) {
-	int i = 0;
-	int count = matc->getMaterialCount();
-	while (i < count) {
-		Material* m = matc->getMaterial(i++);
-		if (m->transparent) return true;
+static bool hasAnyTransparent(const MaterialData& materials) {
+	for (const auto& material : materials.materials) {
+		if (material && material->transparent) return true;
 	}
 	return false;
+}
+
+static Material* getMaterial(const MaterialData& materials, int index) {
+	if (index < 0 || index >= static_cast<int>(materials.materials.size()))
+		return nullptr;
+	return materials.materials[index].get();
+}
+
+struct FrameData {
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::vec3 cameraPosition;
+
+	const DirectionalLight* dirLight;
+	glm::vec3 dirLightDirection;
+
+	int pointLightCount;
+	ShadowParams shadow;
+
+	uint64_t epoch; // identifies this render() call, a program that already saw it has the values above
+
+	// what the draw calls have already set up, so they can skip redundant work
+	unsigned int currentProgram = 0;               // program bound by the last draw
+	const Material* lastMaterial = nullptr;        // material applied by the last draw
+};
+
+struct TransparentDraw {
+	float distance;
+	const MeshData* mesh;
+	const MaterialData* materials;
+	Transform* transform;
+};
+
+static const int SHADOW_TEXTURE_UNIT = 4;
+
+static void applyFrameUniforms(const ShaderProgram& shader, const FrameData& frame) {
+	shader.setMat4("uView", frame.view);
+	shader.setMat4("uProj", frame.proj);
+	shader.setVec3("uViewPos", frame.cameraPosition);
+
+	shader.setMat4("uLightSpaceMatrix", frame.shadow.lightSpaceMatrix);
+	shader.setFloat("uShadowTexelSize", frame.shadow.texelWorldSize);
+	shader.setFloat("uShadowDepthRange", frame.shadow.depthRange);
+	shader.setInt("uShadowMap", SHADOW_TEXTURE_UNIT);
+
+	if (frame.dirLight) {
+		shader.setBool("uHasDirectionalLight", true);
+		shader.setVec3("uDirectionalLight.direction", frame.dirLightDirection);
+		shader.setVec3("uDirectionalLight.color", frame.dirLight->color);
+		shader.setFloat("uDirectionalLight.ambientIntensity", frame.dirLight->ambientStrength);
+		shader.setFloat("uDirectionalLight.diffuseIntensity", frame.dirLight->diffuseStrength);
+		shader.setFloat("uDirectionalLight.specularIntensity", frame.dirLight->specularStrength);
+	}
+	else {
+		shader.setBool("uHasDirectionalLight", false);
+	}
+
+	shader.setInt("uPointLightCount", frame.pointLightCount);
 }
 
 Renderer::Renderer() {
@@ -70,6 +117,7 @@ Renderer::Renderer() {
 Renderer::~Renderer() {
 	if (shadowFBO) glDeleteFramebuffers(1, &shadowFBO);
 	if (shadowDepthTexture) glDeleteTextures(1, &shadowDepthTexture);
+	if (lightSSBO) glDeleteBuffers(1, &lightSSBO);
 }
 
 void Renderer::initShadowMap() {
@@ -99,9 +147,20 @@ void Renderer::initShadowMap() {
 }
 
 void Renderer::render(const Scene& scene) {
-    CameraComponent* cam = scene.getActiveCamera();
-    if (!cam) return;
-    render(scene, cam->getViewMatrix(), cam->getProjectionMatrix());
+	Entity cameraEntity = scene.getActiveCameraEntity();
+	if (!cameraEntity.isValid()) return;
+
+	ECS::ComponentPoolRegistry* registry = scene.getComponentPoolRegistry();
+
+	Camera* camera = registry->getCameras().get(cameraEntity.getHandle());
+	Transform* cameraTransform = registry->getTransforms().get(cameraEntity.getHandle());
+	if (!camera || !cameraTransform) return;
+
+	// rendering only refreshes the transforms' lazily cached (mutable) matrices, it never edits the scene
+	Scene* mutableScene = const_cast<Scene*>(&scene);
+
+	render(scene, CameraSystem::getViewMatrix(*cameraTransform, mutableScene),
+		CameraSystem::getProjectionMatrix(*camera));
 }
 
 void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4& proj) {
@@ -111,22 +170,60 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 	GLint previousFBO;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
 
-	glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
+	Scene* mutableScene = const_cast<Scene*>(&scene); // see render(const Scene&), this is safe pls trust
 
-	const DirectionalLightComponent* dirLight = nullptr;
-	std::vector<PointLightComponent*> pointLights;
+	ECS::ComponentPoolRegistry* registry = scene.getComponentPoolRegistry();
+	ECS::ComponentPool<Transform>& transforms = registry->getTransforms();
+	ECS::ComponentPool<MaterialData>& materials = registry->getMaterials();
 
-	for (const auto& [entityID, entityPtr] : scene.getEntities()) {
-		if (!dirLight)
-			dirLight = entityPtr->getComponent<DirectionalLightComponent>();
-		auto* pl = entityPtr->getComponent<PointLightComponent>();
-		if (pl) pointLights.push_back(pl);
+	glm::mat4 inverseView = glm::inverse(view);
+	glm::vec3 camPos = glm::vec3(inverseView[3]);
+	glm::vec3 camForward = -glm::normalize(glm::vec3(inverseView[2]));
+
+	// no structural pool change happens while rendering, so the pointers gathered here stay valid for the whole frame
+	const DirectionalLight* dirLight = nullptr;
+	const Transform* dirLightTransform = nullptr;
+	glm::vec3 dirLightDirection(0.0f, 0.0f, -1.0f);
+
+	for (auto item : registry->getDirectionalLights()) {
+		Transform* transform = transforms.get(item.entity);
+		if (!transform) continue;
+
+		dirLight = &item.component;
+		dirLightTransform = transform;
+		dirLightDirection = DirectionalLightSystem::getDirection(*transform);
+		break;
 	}
 
-	glm::mat4 lightSpaceMatrix(1.0f);
+	// the members keep their capacity between frames, nothing is allocated here in the steady state
+	std::vector<PointLightGPU>& pointLights = pointLightScratch;
+	pointLights.clear();
+
+	for (auto item : registry->getPointLights()) {
+		Transform* transform = transforms.get(item.entity);
+		if (!transform) continue;
+
+		PointLightGPU pointLight;
+		pointLight.position = TransformSystem::getWorldPosition(*transform);
+		pointLight.ambientIntensity = item.component.ambientStrength;
+		pointLight.color = item.component.color;
+		pointLight.diffuseIntensity = item.component.diffuseStrength;
+		pointLight.specularIntensity = item.component.specularStrength;
+		pointLight.constant = item.component.constant;
+		pointLight.linear = item.component.linear;
+		pointLight.quadratic = item.component.quadratic;
+
+		pointLights.push_back(pointLight);
+	}
+
+	ShadowParams shadow{ glm::mat4(1.0f), 1.0f, 1.0f };
 
 	if (dirLight) {
-		lightSpaceMatrix = dirLight->getLightSpaceMatrix(camPos);
+		DirectionalLightSystem::ShadowFrustum frustum = DirectionalLightSystem::getShadowFrustum(*dirLight);
+
+		shadow.lightSpaceMatrix = DirectionalLightSystem::getLightSpaceMatrix(*dirLight, *dirLightTransform, camPos, camForward);
+		shadow.texelWorldSize = frustum.size / static_cast<float>(SHADOW_WIDTH);
+		shadow.depthRange = frustum.farPlane - frustum.nearPlane;
 
 		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
@@ -134,13 +231,15 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 		glEnable(GL_DEPTH_TEST);
 
 		depthShader->use();
+		depthShader->setMat4("uLightSpaceMatrix", shadow.lightSpaceMatrix);
 
-		for (const auto& [entityID, entityPtr] : scene.getEntities()) {
-			const MeshComponent* mc = entityPtr->getComponent<MeshComponent>();
-			const MaterialComponent* matc = entityPtr->getComponent<MaterialComponent>();
-			if (!mc || !matc || !mc->getMesh()) continue;
+		for (auto item : registry->getMeshes()) {
+			if (!item.component.mesh || !materials.has(item.entity)) continue;
 
-			drawEntityDepth(*entityPtr, mc, lightSpaceMatrix);
+			Transform* transform = transforms.get(item.entity);
+			if (!transform) continue;
+
+			drawEntityDepth(TransformSystem::getMatrix(*transform, mutableScene), item.component);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
@@ -151,116 +250,128 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 	glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	for (const auto& [entityID, entityPtr] : scene.getEntities()) {
-		const MeshComponent* mc = entityPtr->getComponent<MeshComponent>();
-		const MaterialComponent* matc = entityPtr->getComponent<MaterialComponent>();
-		if (!mc || !matc) continue;
+	std::vector<TransparentDraw>& transparentDraws = transparentDrawScratch;
+	transparentDraws.clear();
 
-		drawEntity(*entityPtr, mc, matc, view, proj, camPos,
-			dirLight, pointLights, lightSpaceMatrix, false);
+	glEnable(GL_CULL_FACE);
+
+	FrameData frame;
+	frame.epoch = ++frameEpoch;
+	frame.view = view;
+	frame.proj = proj;
+	frame.cameraPosition = camPos;
+	frame.dirLight = dirLight;
+	frame.dirLightDirection = dirLightDirection;
+	frame.pointLightCount = static_cast<int>(pointLights.size());
+	frame.shadow = shadow;
+
+	// once for the whole frame: the lights and the shadow map are the same for every draw call below
+	uploadPointLights(pointLights);
+
+	glActiveTexture(GL_TEXTURE0 + SHADOW_TEXTURE_UNIT);
+	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
+	glActiveTexture(GL_TEXTURE0);
+
+	for (auto item : registry->getMeshes()) {
+		MaterialData* materialData = materials.get(item.entity);
+		Transform* transform = transforms.get(item.entity);
+		if (!materialData || !transform) continue;
+
+		drawEntity(TransformSystem::getMatrix(*transform, mutableScene), item.component, *materialData, frame, false);
+
+		if (hasAnyTransparent(*materialData)) {
+			glm::vec3 worldPosition = TransformSystem::getWorldPosition(*transform, mutableScene);
+			transparentDraws.push_back({ glm::length(worldPosition - camPos), &item.component, materialData, transform });
+		}
 	}
 
-	std::vector<const Entity*> transparentEntities;
-	for (const auto& [entityID, entityPtr] : scene.getEntities()) {
-		const MaterialComponent* matc = entityPtr->getComponent<MaterialComponent>();
-		if (matc && hasAnyTransparent(matc))
-			transparentEntities.push_back(entityPtr.get());
-	}
-
-	std::sort(transparentEntities.begin(), transparentEntities.end(),
-		[&camPos](const Entity* a, const Entity* b) {
-			return glm::length(a->transform.getWorldPosition() - camPos) >
-				glm::length(b->transform.getWorldPosition() - camPos);
-		});
+	// farthest first
+	std::sort(transparentDraws.begin(), transparentDraws.end(),
+		[](const TransparentDraw& a, const TransparentDraw& b) { return a.distance > b.distance; });
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDepthMask(GL_FALSE);
 
-	for (const Entity* entity : transparentEntities) {
-		const MeshComponent* mc = entity->getComponent<MeshComponent>();
-		const MaterialComponent* matc = entity->getComponent<MaterialComponent>();
-		if (!mc || !matc) continue;
-		drawEntity(*entity, mc, matc, view, proj, camPos,
-			dirLight, pointLights, lightSpaceMatrix, true);
+	for (const TransparentDraw& draw : transparentDraws) {
+		drawEntity(TransformSystem::getMatrix(*draw.transform, mutableScene), *draw.mesh, *draw.materials, frame, true);
 	}
 
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
 }
 
-void Renderer::drawEntity(const Entity& entity,
-	const MeshComponent* meshComponent,
-	const MaterialComponent* materialComponent,
-	const glm::mat4& view,
-	const glm::mat4& proj,
-	const glm::vec3& cameraPosition,
-	const DirectionalLightComponent* dirLight,
-	const std::vector<PointLightComponent*> pointLights,
-	const glm::mat4& lightSpaceMatrix,
+void Renderer::uploadPointLights(const std::vector<PointLightGPU>& pointLights) const {
+	if (pointLights.empty()) {
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+		return;
+	}
+
+	if (lightSSBO == 0)
+		glGenBuffers(1, &lightSSBO);
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightSSBO);
+	glBufferData(GL_SHADER_STORAGE_BUFFER,
+		pointLights.size() * sizeof(PointLightGPU),
+		pointLights.data(),
+		GL_DYNAMIC_DRAW);
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, lightSSBO);
+}
+
+void Renderer::drawEntity(const glm::mat4& model,
+	const MeshData& mesh,
+	const MaterialData& materials,
+	FrameData& frame,
 	bool transparentOnly) const {
 
-	if (!meshComponent->getMesh()) return;
-
-	const glm::mat4 model = entity.getTransform().getMatrix();
+	if (!mesh.mesh) return;
 
 	auto drawWithMaterial = [&](Material& material) {
 		ShaderProgram& shader = *material.shader;
-		shader.use();
-		material.apply();
+		unsigned int programID = shader.getID();
+
+		if (frame.currentProgram != programID) {
+			shader.use();
+			frame.currentProgram = programID;
+		}
+
+		// first time this program is used in this render() call: give it the frame's uniforms
+		if (shader.beginEpoch(frame.epoch))
+			applyFrameUniforms(shader, frame);
+
+		// consecutive draws with the same material
+		// keep the uniforms and the diffuse texture binding the previous draw set
+		if (frame.lastMaterial != &material) {
+			material.apply();
+			frame.lastMaterial = &material;
+		}
 
 		shader.setMat4("uModel", model);
-		shader.setMat4("uView", view);
-		shader.setMat4("uProj", proj);
-		shader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
-		shader.setVec3("uViewPos", cameraPosition);
-
-		if (dirLight) {
-			shader.setBool("uHasDirectionalLight", true);
-			shader.setVec3("uDirectionalLight.direction", dirLight->getDirection());
-			shader.setVec3("uDirectionalLight.color", dirLight->color);
-			shader.setFloat("uDirectionalLight.ambientIntensity", dirLight->ambientStrength);
-			shader.setFloat("uDirectionalLight.diffuseIntensity", dirLight->diffuseStrength);
-			shader.setFloat("uDirectionalLight.specularIntensity", dirLight->specularStrength);
-		}
-		else {
-			shader.setBool("uHasDirectionalLight", false);
-		}
-
-		auto buffer = buildPointLightBuffer(pointLights);
-		shader.setSSBO<PointLightGPU>(0, &lightSSBO, "uPointLightCount", buffer);
-
-		glActiveTexture(GL_TEXTURE4);
-		glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
-		shader.setInt("uShadowMap", 4);
 	};
 
-	const auto& submeshes = meshComponent->getMesh()->getSubMeshes();
+	const auto& submeshes = mesh.mesh->getSubMeshes();
 
 	if (submeshes.empty()) {
-		Material* mat = materialComponent->getMaterial(0);
+		Material* mat = getMaterial(materials, 0);
 		if (!mat || !mat->shader) return;
 		if (mat->transparent != transparentOnly) return; // skip wrong pass
 		drawWithMaterial(*mat);
-		meshComponent->getMesh()->draw();
+		mesh.mesh->draw();
 	}
 	else {
 		for (int i = 0; i < static_cast<int>(submeshes.size()); i++) {
-			Material* mat = materialComponent->getMaterial(submeshes[i].materialIndex);
-			if (!mat) mat = materialComponent->getMaterial(0);
+			Material* mat = getMaterial(materials, submeshes[i].materialIndex);
+			if (!mat) mat = getMaterial(materials, 0);
 			if (!mat || !mat->shader) continue;
 			if (mat->transparent != transparentOnly) continue; // skip wrong pass
 			drawWithMaterial(*mat);
-			meshComponent->getMesh()->drawSubMesh(i);
+			mesh.mesh->drawSubMesh(i);
 		}
 	}
 }
 
-void Renderer::drawEntityDepth(const Entity& entity,
-	const MeshComponent* meshComponent,
-	const glm::mat4& lightSpaceMatrix) const {
-	glm::mat4 model = entity.getTransform().getMatrix();
-	depthShader->setMat4("uLightSpaceMatrix", lightSpaceMatrix);
+void Renderer::drawEntityDepth(const glm::mat4& model, const MeshData& mesh) const {
 	depthShader->setMat4("uModel", model);
-    meshComponent->getMesh()->draw();
+	mesh.mesh->draw();
 }

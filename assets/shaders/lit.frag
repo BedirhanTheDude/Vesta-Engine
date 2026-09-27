@@ -54,6 +54,8 @@ uniform bool uHasTexture;
 uniform sampler2D uDiffuseTexture;
 
 uniform sampler2D uShadowMap;
+uniform float uShadowTexelSize;  // world units covered by one shadow map texel
+uniform float uShadowDepthRange; // far - near of the shadow projection, world units
 
 float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
@@ -63,7 +65,15 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
         return 0.0;
 
     float currentDepth = projCoords.z;
-    float bias = max(0.001 * (1.0 - dot(normal, lightDir)), 0.0003);
+
+    // Bias in world units, then converted to the 0..1 depth of the (orthographic, so linear) shadow map.
+    // Across one texel the surface depth changes by texelSize * tan(angle to the light), and the 3x3 PCF
+    // kernel below reads a wider footprint, so the bias has to grow with both. A constant depth bias
+    // stops working as soon as the shadow box size or the near/far range change.
+    float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
+    float tanTheta = min(sqrt(1.0 - cosTheta * cosTheta) / max(cosTheta, 0.1), 5.0);
+    float biasWorld = uShadowTexelSize * (0.5 + tanTheta);
+    float bias = biasWorld / max(uShadowDepthRange, 0.001);
 
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);

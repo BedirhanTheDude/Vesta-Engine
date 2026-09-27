@@ -2,50 +2,95 @@
 
 #include <scene/Scene.h>
 #include <scene/Entity.h>
-#include <scene/components/TransformComponent.h>
+
+#include <scene/components/Camera.h>
+#include <scene/components/Transform.h>
+#include <scene/components/ProxyUtil.h>
+#include <scene/system/CameraSystem.h>
 
 #include <scene/components/ComponentFactory.h>
 #include <persistance/Archive.h>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 REGISTER(CameraComponent);
 
+void CameraComponent::init(float fov, float aspect, float nearPlane, float farPlane) {
+    Camera* camera = resolveComponent<Camera>(entity);
+    if (!camera) return;
+
+    camera->fov = fov;
+    camera->aspect = aspect;
+    camera->nearPlane = nearPlane;
+    camera->farPlane = farPlane;
+}
+
+float CameraComponent::getFov() const {
+    Camera* camera = resolveComponent<Camera>(entity);
+    return camera ? camera->fov : 45.0f;
+}
+
+void CameraComponent::setFov(float fov) {
+    if (Camera* camera = resolveComponent<Camera>(entity)) camera->fov = fov;
+}
+
+float CameraComponent::getAspect() const {
+    Camera* camera = resolveComponent<Camera>(entity);
+    return camera ? camera->aspect : 1.0f;
+}
+
+void CameraComponent::setAspect(float aspect) {
+    if (Camera* camera = resolveComponent<Camera>(entity)) camera->aspect = aspect;
+}
+
+float CameraComponent::getNearPlane() const {
+    Camera* camera = resolveComponent<Camera>(entity);
+    return camera ? camera->nearPlane : 0.1f;
+}
+
+void CameraComponent::setNearPlane(float nearPlane) {
+    if (Camera* camera = resolveComponent<Camera>(entity)) camera->nearPlane = nearPlane;
+}
+
+float CameraComponent::getFarPlane() const {
+    Camera* camera = resolveComponent<Camera>(entity);
+    return camera ? camera->farPlane : 100.0f;
+}
+
+void CameraComponent::setFarPlane(float farPlane) {
+    if (Camera* camera = resolveComponent<Camera>(entity)) camera->farPlane = farPlane;
+}
+
 glm::mat4 CameraComponent::getViewMatrix() const {
-    glm::mat4 world = owner->getTransform().getMatrix();
+    Transform* transform = resolveComponent<Transform>(entity);
+    if (!transform) return glm::mat4(1.0f);
 
-    glm::vec3 pos = glm::vec3(world[3]);
-    glm::vec3 forward = glm::normalize(glm::vec3(world[2]));
-    glm::vec3 up = glm::normalize(glm::vec3(world[1]));
-
-    return glm::lookAt(pos, pos - forward, up);
+    return CameraSystem::getViewMatrix(*transform, sceneOf(entity));
 }
 
 glm::mat4 CameraComponent::getProjectionMatrix() const {
-	return glm::perspective(glm::radians(fov), aspect, nearPlane, farPlane);
+    Camera* camera = resolveComponent<Camera>(entity);
+    return camera ? CameraSystem::getProjectionMatrix(*camera) : glm::mat4(1.0f);
 }
 
 bool CameraComponent::onAttach() {
-    owner->getScene().onCameraAdded(this);
+    if (!entity.isValid()) return false;
+
+    entity.getScene().onCameraAdded(entity);
     return true;
 }
 
 void CameraComponent::onDetach() {
-    if (owner->getScene().getActiveCamera() == this)
-        owner->getScene().setActiveCamera(nullptr);
+    if (!entity.isValid()) return;
+
+    if (entity.getScene().getActiveCameraEntity() == entity)
+        entity.getScene().setActiveCamera(Entity());
 }
 
 void CameraComponent::serialize(Archive& arch) const {
-    arch.set("fov", fov);
-    arch.set("aspect", aspect);
-    arch.set("near", nearPlane);
-    arch.set("far", farPlane);
+    if (Camera* camera = resolveComponent<Camera>(entity))
+        CameraSystem::serialize(*camera, arch);
 }
 
 void CameraComponent::deserialize(const Archive& arch) {
-    if (!arch.get("fov", fov)) fov = 70.0f;
-    if (!arch.get("aspect", aspect)) aspect = 1.25f;
-    if (!arch.get("near", nearPlane)) nearPlane = 0.1f;
-    if (!arch.get("far", farPlane)) farPlane = 100.0f;
+    if (Camera* camera = resolveComponent<Camera>(entity))
+        CameraSystem::deserialize(*camera, arch);
 }

@@ -2,6 +2,7 @@
 
 #include <scripting/Script.h>
 #include <glm/common.hpp>
+#include <glm/gtc/constants.hpp>
 
 #include <scene/components/MaterialComponent.h>
 #include <renderer/Material.h>
@@ -15,10 +16,10 @@ public:
 	float timeElapsed = 0.0f;
 
 	glm::vec3 colour = { 1.0f, 1.0f, 1.0f };
-	MaterialComponent* matc;
+	std::optional<MaterialComponent> matc;
 
 	void onStart() override {
-		matc = owner->getComponent<MaterialComponent>();
+		matc = entity.getComponent<MaterialComponent>();
 	}
 
 	void onUpdate(float dt) override {

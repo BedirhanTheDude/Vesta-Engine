@@ -28,13 +28,11 @@ bool AssetController::loadTexture(const std::string& textureName) {
 }
 
 bool AssetController::setMesh(unsigned int entityID, const std::string& meshName) {
-	Entity* entity = Application::getCurrentScene()->findEntity(entityID);
-	if (!entity)
+	Entity entity = Application::getCurrentScene()->findEntity(entityID);
+	if (!entity.isAlive())
 		return false;
-
-	MeshComponent* mc;
 	
-	mc = entity->getComponent<MeshComponent>();
+	auto mc = entity.getComponent<MeshComponent>();
 	if (!mc) return false;
 
 	std::shared_ptr<Mesh> mesh = AssetManager::getMesh(meshName);
@@ -48,14 +46,11 @@ bool AssetController::setMesh(unsigned int entityID, const std::string& meshName
 }
 
 bool AssetController::setModel(unsigned int entityID, const std::string& modelName) {
-	Entity* entity = Application::getCurrentScene()->findEntity(entityID);
-	if (!entity)
+	Entity entity = Application::getCurrentScene()->findEntity(entityID);
+	if (!entity.isAlive())
 		return false;
 
-	MeshComponent* meshc;
-	MaterialComponent* matc;
-
-	meshc = entity->getComponent<MeshComponent>();
+	auto meshc = entity.getComponent<MeshComponent>();
 	if (!meshc) return false;
 
 	LoadedModel model = AssetManager::getModel(modelName);
@@ -65,20 +60,18 @@ bool AssetController::setModel(unsigned int entityID, const std::string& modelNa
 
 	meshc->setMesh(model.mesh);
 
-	matc = entity->getComponent<MaterialComponent>();
+	auto matc = entity.getComponent<MaterialComponent>();
 	if (matc) matc->setMaterials(model.materials);
 
 	return true;
 }
 
 bool AssetController::setTexture(unsigned int entityID, unsigned int groupIdx, unsigned int payloadIdx, const std::string& textureName) {
-	Entity* entity = Application::getCurrentScene()->findEntity(entityID);
-	if (!entity)
+	Entity entity = Application::getCurrentScene()->findEntity(entityID);
+	if (!entity.isAlive())
 		return false;
 
-	MaterialComponent* mc;
-
-	mc = entity->getComponent<MaterialComponent>();
+	auto mc = entity.getComponent<MaterialComponent>();
 	if (!mc) return false;
 
 	std::shared_ptr<Texture> tex = AssetManager::getTexture(textureName);

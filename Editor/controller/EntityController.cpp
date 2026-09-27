@@ -1,124 +1,134 @@
 #include <controller/EntityController.h>
 
 #include <scene/Scene.h>
-#include <scene/Entity.h>
 #include <scene/components/TransformComponent.h>
 
 #include <core/Application.h>
 
 #include <cstdint>
 
-const std::set<unsigned int>& EntityController::getAllEntityIDs() {
+static Entity selectedEntity;
+
+std::vector<unsigned int> EntityController::getAllEntityIDs() {
+	std::vector<unsigned int> IDs;
+
 	Scene* scene = Application::getCurrentScene();
-	return scene->getEntityIDs();
+	if (!scene) return IDs;
+
+	for (const Entity& entity : scene->getEntities())
+		IDs.push_back(entity.getID());
+
+	return IDs;
 }
 
-const std::set<unsigned int>& EntityController::getEntityChildIDs(unsigned int parentID) {
-	static const std::set<unsigned int> empty;
+std::vector<unsigned int> EntityController::getEntityChildIDs(unsigned int parentID) {
+	std::vector<unsigned int> IDs;
 
-	Entity* parent = resolveEntity(parentID);
+	Entity parent = resolveEntity(parentID);
+	if (!parent.isValid()) return IDs;
 
-	if (!parent) return empty;
+	for (const Entity& child : parent.getTransform().getChildren()) {
+		if (child.isAlive())
+			IDs.push_back(child.getID());
+	}
 
-	return parent->transform.getChildrenIDs();
-}
-
-const std::map<unsigned int, unsigned int>& EntityController::getComponentIdxMap(unsigned int entityID) {
-	static const std::map<unsigned int, unsigned int> empty;
-
-	Entity* entity = resolveEntity(entityID);
-
-	if (!entity) return empty;
-
-	return entity->getComponentIdxMap();
+	return IDs;
 }
 
 void EntityController::setSelectedEntityID(unsigned int ID) {
-	Entity* entity = resolveEntity(ID);
+	Entity entity = resolveEntity(ID);
 
-	if (entity) 
-		selectedEntityID = (int64_t)ID;
+	if (entity.isValid())
+		selectedEntity = entity;
 	// else add console log
 }
 
 void EntityController::setEntityParent(unsigned int childID, unsigned int parentID) {
-	Entity* childEntity = resolveEntity(childID);
-	Entity* parentEntity = resolveEntity(parentID);
+	Entity child = resolveEntity(childID);
+	Entity parent = resolveEntity(parentID);
 
-	if (childEntity && parentEntity)
-		childEntity->transform.setParent(&parentEntity->transform);
+	if (child.isValid() && parent.isValid())
+		child.getTransform().setParent(parent);
 }
 
 void EntityController::unparentEntity(unsigned int ID) {
-	Entity* entity = resolveEntity(ID);
+	Entity entity = resolveEntity(ID);
 
-	if (entity)
-		entity->transform.setParent(nullptr);
+	if (entity.isValid())
+		entity.getTransform().setParent(Entity());
 }
 
 void EntityController::clearSelectedEntityID() {
-	selectedEntityID = -1;
+	selectedEntity = Entity();
 }
 
 void EntityController::renameEntity(unsigned int ID, const char* name) {
-	Entity* entity = resolveEntity(ID);
+	Entity entity = resolveEntity(ID);
 
-	if (entity)
-		entity->setName(std::string(name));
+	if (entity.isValid() && name)
+		entity.setName(std::string(name));
 }
 
 void EntityController::removeEntity(unsigned int ID) {
 	Scene* scene = Application::getCurrentScene();
+	if (!scene) return;
 
 	scene->removeEntity(ID);
 }
 
-Entity* EntityController::getSelectedEntity() {
-	if (selectedEntityID < 0) return nullptr;
-	return resolveEntity((unsigned int)selectedEntityID);
+Entity EntityController::getSelectedEntity() {
+	// removed since it was selected, or the scene was reloaded
+	if (!selectedEntity.isAlive())
+		selectedEntity = Entity();
+
+	return selectedEntity;
 }
 
-void EntityController::setSelectedEntity(Entity* entity) {
-	selectedEntityID = entity ? (int64_t)entity->getID() : -1;
+void EntityController::setSelectedEntity(const Entity& entity) {
+	selectedEntity = entity.isAlive() ? entity : Entity();
 }
 
-int64_t EntityController::getSelectedEntityID() {
-	return selectedEntityID;
+uint32_t EntityController::getSelectedEntityID() {
+	Entity selected = getSelectedEntity();
+
+	return selected.isValid() ? selected.getID() : UINT32_MAX;
 }
 
 std::string EntityController::getEntityName(unsigned int ID) {
-	Entity* entity = resolveEntity(ID);
+	Entity entity = resolveEntity(ID);
 
-	if (entity)
-		return entity->getName();
+	if (entity.isValid())
+		return entity.getName();
 	else return std::string("");
 }
 
-bool EntityController::entityHasParent(unsigned int ID) {
-	Entity* entity = resolveEntity(ID);
+bool EntityController::isEntityAlive(const Entity& entity) {
+	return entity.isAlive();
+}
 
-	if (entity && entity->transform.getParent())
-		return true;
-	else
-		return false;
+bool EntityController::entityHasParent(unsigned int ID) {
+	Entity entity = resolveEntity(ID);
+
+	return entity.isValid() && entity.getTransform().getParent().isValid();
 }
 
 bool EntityController::wouldCreateCycle(unsigned int childID, unsigned int newParentID) {
-	Entity* dragged = resolveEntity(childID);
-	Entity* target = resolveEntity(newParentID);
+	Entity dragged = resolveEntity(childID);
+	Entity target = resolveEntity(newParentID);
 
-	if (!dragged || !target) return true; // fail safe, refuse if either side is invalid
+	if (!dragged.isValid() || !target.isValid()) return true; // fail safe, refuse if either side is invalid
 	if (dragged == target) return true; // can't parent to self
 
-	TransformComponent* check = &target->transform;
-	while (check) {
-		if (check == &dragged->transform) return true;
-		check = check->getParent();
+	// walk up from the new parent, meeting the dragged entity means it would become its own ancestor
+	for (Entity check = target; check.isValid(); check = check.getTransform().getParent()) {
+		if (check == dragged) return true;
 	}
 	return false;
 }
 
-Entity* EntityController::resolveEntity(unsigned int ID) {
+Entity EntityController::resolveEntity(unsigned int ID) {
 	Scene* scene = Application::getCurrentScene();
+	if (!scene) return Entity();
+
 	return scene->findEntity(ID);
 }

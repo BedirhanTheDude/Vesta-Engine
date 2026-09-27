@@ -1,16 +1,15 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
-#include <set>
-#include <map>
+#include <vector>
 
-class Entity;
+#include <scene/Entity.h>
+
 
 namespace EntityController {
-	const std::set<unsigned int>& getAllEntityIDs();
-	const std::set<unsigned int>& getEntityChildIDs(unsigned int parentID);
-
-	const std::map<unsigned int, unsigned int>& getComponentIdxMap(unsigned int entityID);
+	std::vector<unsigned int> getAllEntityIDs();
+	std::vector<unsigned int> getEntityChildIDs(unsigned int parentID);
 
 	void setSelectedEntityID(unsigned int ID);
 	void setEntityParent(unsigned int childID, unsigned int parentID);
@@ -19,16 +18,18 @@ namespace EntityController {
 	void renameEntity(unsigned int ID, const char* name);
 	void removeEntity(unsigned int ID);
 
-	Entity* getSelectedEntity();
-	void setSelectedEntity(Entity* entity);
+	Entity getSelectedEntity();
+	// selecting a dead or invalid entity clears the selection
+	void setSelectedEntity(const Entity& entity);
 
-	int64_t getSelectedEntityID();
+	// UINT32_MAX when nothing is selected
+	uint32_t getSelectedEntityID();
 	std::string getEntityName(unsigned int ID);
 
+	bool isEntityAlive(const Entity& entity);
 	bool wouldCreateCycle(unsigned int childID, unsigned int newParentID);
 	bool entityHasParent(unsigned int childID);
 
-	inline int64_t selectedEntityID = -1;
-
-	Entity* resolveEntity(unsigned int ID);
+	// the invalid Entity if there is no live entity with this ID
+	Entity resolveEntity(unsigned int ID);
 };
