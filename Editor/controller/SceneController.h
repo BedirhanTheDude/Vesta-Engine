@@ -1,13 +1,18 @@
 #pragma once
 
 #include <string>
+#include <filesystem>
 
 class Scene;
 
 namespace SceneController {
-	void newScene(const std::string& name = "Scene");
+	// the scene is saved to <directory>/<name>.vestascene on its first save,
+	// false if the directory is outside the project or that file already exists
+	bool newScene(const std::string& name, const std::filesystem::path& directory);
 
-	void loadScene(const std::string& name, bool temp = false);
+	// sceneFile is an absolute path to a scene file inside the project
+	bool openScene(const std::filesystem::path& sceneFile);
+	// reloads the current scene from its file (or the temp slot)
 	void loadScene(bool temp = false);
 	void saveScene(bool temp = false);
 

@@ -23,7 +23,6 @@ class Archive;
         unsigned int UID = componentTypeUID<ScriptName>(); \
         __componentTypeUIDToString(UID, true, #ScriptName); \
         ComponentFactory::registerScript(#ScriptName, [](Entity& e, const Archive& arch) { \
-            ComponentFactory::scriptCacheValid = false; \
             auto& c = e.addComponent<ScriptName>(); \
             c.deserialize(arch); \
         }, COMPONENT_OPS(ScriptName)); \

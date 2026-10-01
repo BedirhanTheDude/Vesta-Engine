@@ -35,8 +35,8 @@ public:
     float getQuadratic() const;
     void setQuadratic(float quadratic);
 
-    void serialize(Archive& arch) const;
-    void deserialize(const Archive& arch);
+    void serialize(Archive& arch) const override;
+    void deserialize(const Archive& arch) override;
 
     bool onAttach() { return true; }
     void onDetach() {}

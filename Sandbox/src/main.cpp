@@ -16,6 +16,7 @@
 
 #include <core/Application.h>
 #include <core/Input.h>
+#include <core/Project.h>
 
 #include <scene/Scene.h>
 #include <scene/Entity.h>
@@ -41,7 +42,39 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
-int main() {
+// command line argument (a directory is made into a project if it isn't one yet), else the last opened project,
+// else the sample project in the repo
+static bool openProject(int argc, char** argv) {
+	static const char* editorConfigName = "editor.dat";
+
+	bool opened = false;
+
+	if (argc > 1) {
+		// argv is in the ANSI code page, so this is the narrow (not u8path) constructor
+		std::filesystem::path requested(argv[1]);
+		opened = Project::create(requested, requested.filename().string());
+	}
+	else {
+		Archive editorConfig;
+		std::string lastProject;
+		if (editorConfig.loadFromFile(editorConfigName) && editorConfig.get("last_project", lastProject))
+			opened = Project::open(std::filesystem::u8path(lastProject));
+	}
+
+	if (!opened) return false;
+
+	Archive editorConfig;
+	editorConfig.set("last_project", Project::getRoot().string());
+	editorConfig.saveToFile(editorConfigName);
+
+	return true;
+}
+
+int main(int argc, char** argv) {
+	if (!openProject(argc, argv)) {
+		std::cout << "Failed to open a project\n";
+	}
+
 	if (!glfwInit()) {
 		std::cout << "Failed to initialize GLFW\n";
 		return -1;
@@ -61,6 +94,8 @@ int main() {
 		glfwTerminate();
 		return -1;
 	}
+
+	Application::setWindow(window); // store a global pointer to the window
 
 	int iconW, iconH, iconChannels;
 	unsigned char* iconPixels = stbi_load("icon.png", &iconW, &iconH, &iconChannels, 4);
@@ -84,12 +119,12 @@ int main() {
 	glViewport(0, 0, 1000, 800);
 
 
-	// TODO: Write an actual polling system for script modification after setting up a 
-	// working project directory system for the Engine, until then leave this commented out
+	// TODO: Write an actual polling system for script modification, until then leave poll() commented out
 
 	// compile() emits temp_scripts.dll; replaceOldDLLFile() renames it to scripts.dll
 	// (the reload path does this too, but the initial compile needs it explicitly).
-	if (!std::filesystem::exists("scripts.dll")) {
+	// Both live in <project>/.vesta/build
+	if (!ScriptLoader::scriptsDLLExists()) {
 		if (ScriptCompiler::compile())
 			ScriptLoader::replaceOldDLLFile();
 	}
@@ -97,17 +132,10 @@ int main() {
 
 	Input::init(window);
 
-	std::string sceneName = "scene";
-
-	Archive cfgArch;
-	if (cfgArch.loadFromFile("start.dat")) {
-		cfgArch.get("last_scene", sceneName);
-	}
-
 	// Application owns the Scene and Renderer; controllers reach them through Application,
 	// so the editor panels and this loop share one source of truth.
-	// newScene loads <name>.vrea if present, otherwise builds the default scene.
-	Scene* scene = Application::newScene(sceneName);
+	// newScene loads the project's startup scene if there is one, otherwise builds the default scene.
+	Scene* scene = Application::newScene(Project::getStartupScene());
 	Renderer* renderer = Application::newRenderer();
 
 	ImGuiLayer imguiLayer;
@@ -120,9 +148,7 @@ int main() {
 		};
 
 	editorLayer.Init(onExit);
-	editorLayer.initFileManager(
-		(std::filesystem::current_path() / "assets").string(),
-		(std::filesystem::current_path() / "scripts").string());
+	editorLayer.initFileManager(Project::getRoot());
 
 	ViewportFramebuffer gameFramebuffer;
 	gameFramebuffer.Init(1000, 800);

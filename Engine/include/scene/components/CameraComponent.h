@@ -31,6 +31,6 @@ public:
 	bool onAttach();
 	void onDetach();
 
-	void serialize(Archive& arch) const;
-	void deserialize(const Archive& arch);
+	void serialize(Archive& arch) const override;
+	void deserialize(const Archive& arch) override;
 };

@@ -13,6 +13,7 @@ namespace ComponentController {
 	void removeComponent(unsigned int entityID, unsigned int componentUID);
 	bool entityHasComponent(unsigned int entityID, const std::string& componentName);
 	const std::vector<std::string>& getAvailableComponentNames();
+	const std::vector<std::string>& getAvailableScriptNames();
 
 	// UIDs of the components the entity has (built-ins and scripts, not the transform), by value
 	std::vector<unsigned int> getEntityComponentUIDs(unsigned int entityID);

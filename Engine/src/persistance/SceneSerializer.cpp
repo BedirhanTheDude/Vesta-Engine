@@ -1,7 +1,8 @@
 #include "SceneSerializer.h"
 
-#include <fstream>
 #include <filesystem>
+#include <iostream>
+#include <system_error>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -11,16 +12,33 @@
 #include <scene/components/CameraComponent.h>
 #include <scene/components/ComponentFactory.h>
 #include <persistance/Archive.h>
+#include <core/Project.h>
 
-void SceneSerializer::save(const Scene& scene, bool temp) {
-    if (scene.isPlaying) return;
+static bool getSceneFilePath(const Scene& scene, bool temp, std::filesystem::path& outPath) {
+    if (!Project::isOpen()) {
+        std::cerr << "[Error] No project is open\n";
+        return false;
+    }
 
-    static std::string startSceneConfigName = "start.dat";
+    if (temp) {
+        outPath = Project::getCacheDirectory() / (std::string("temp") + Project::sceneExtension);
+        return true;
+    }
 
-    std::string suffix = temp ? "_temp.vrea" : ".vrea";
+    if (!Project::resolve(scene.getScenePath(), outPath)) {
+        std::cerr << "[Error] Scene \"" << scene.getSceneName() << "\" has no valid path inside the project: \""
+            << scene.getScenePath() << "\"\n";
+        return false;
+    }
 
-    std::filesystem::path scenePath = std::filesystem::current_path() /
-        "assets" / "scenes" / (scene.getSceneName() + suffix);
+    return true;
+}
+
+bool SceneSerializer::save(const Scene& scene, bool temp) {
+    if (scene.isPlaying) return false;
+
+    std::filesystem::path scenePath;
+    if (!getSceneFilePath(scene, temp, scenePath)) return false;
 
     Archive arch;
     Archive sceneArch;
@@ -51,26 +69,32 @@ void SceneSerializer::save(const Scene& scene, bool temp) {
     }
 
     arch.set("scene", std::move(sceneArch));
-    arch.saveToFile(scenePath.string());
 
-    if (!temp) {
-        Archive cfg;
-        cfg.set("last_scene", scene.getSceneName());
-        cfg.saveToFile(startSceneConfigName);
+    std::error_code ec;
+    std::filesystem::create_directories(scenePath.parent_path(), ec);
+
+    if (!arch.saveToFile(scenePath)) {
+        std::cerr << "[Error] Could not write scene file " << scenePath << '\n';
+        return false;
     }
+
+    if (!temp)
+        Project::setStartupScene(scene.getScenePath());
+
+    return true;
 }
 
 bool SceneSerializer::load(Scene& scene, bool temp) {
-    scene.clear();
-    scene.isPlaying = false;
-
-    std::string suffix = temp ? "_temp.vrea" : ".vrea";
-
-    std::filesystem::path scenePath = std::filesystem::current_path() /
-        "assets" / "scenes" / (scene.getSceneName() + suffix);
+    std::filesystem::path scenePath;
+    if (!getSceneFilePath(scene, temp, scenePath)) return false;
 
     Archive arch;
-    if (!arch.loadFromFile(scenePath.string())) return false;
+    if (!arch.loadFromFile(scenePath)) {
+        std::cerr << "[Error] Could not read scene file " << scenePath << '\n';
+        return false;
+    }
+
+    scene.clear();
 
     Archive sceneArch = arch.get("scene");
 

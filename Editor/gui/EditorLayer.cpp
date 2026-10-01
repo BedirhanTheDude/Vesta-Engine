@@ -12,6 +12,10 @@
 #include <controller/ComponentController.h>
 #include <controller/TransformController.h>
 #include <controller/EditorSelectionController.h>
+#include <controller/WindowController.h>
+#include <controller/ProjectController.h>
+
+#include <platform/FileDialog.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -24,9 +28,8 @@ void EditorLayer::Init(std::function<void()> onExit) {
     this->onExit = onExit;
 }
 
-void EditorLayer::initFileManager(const std::string& rootAssetsPath, const std::string& scriptsPath) {
-    fileManager.init(rootAssetsPath);
-    fileManager.initScriptsPath(scriptsPath);
+void EditorLayer::initFileManager(const std::filesystem::path& projectRoot) {
+    fileManager.init(projectRoot);
 }
 
 void EditorLayer::OnUIRender() {
@@ -83,15 +86,31 @@ void EditorLayer::ShowDockspace() {
 }
 
 void EditorLayer::ShowMenuBar() {
-    static bool openNewScene = false;
+    static bool createNewScene = false;
+    static bool createNewProject = false;
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("New Scene"))
-                openNewScene = true;
+            if (ImGui::MenuItem("New Project"))
+                createNewProject = true;
 
-            if (ImGui::MenuItem("Open Scene", "Ctrl+O")) {
-                SceneController::loadScene(); // NOTE: add a dialog to select scene file
+            if (ImGui::MenuItem("Open Project")) {
+                std::filesystem::path outFolder;
+                FileDialog::pickFolder(WindowController::getApplicationWindow(), outFolder); // blocking
+
+                if (ProjectController::open(outFolder)) {
+                    initFileManager(ProjectController::getProjectRoot());
+                    std::string projectName;
+                    ProjectController::tryGetProjectName(projectName);
+                    WindowController::addWindowSuffix(projectName);
+                }
+            }
+
+            if (ImGui::MenuItem("New Scene"))
+                createNewScene = true;
+
+            if (ImGui::MenuItem("Reload Scene", "Ctrl+O")) {
+                SceneController::loadScene();
             }
             if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {
                 SceneController::saveScene();
@@ -136,9 +155,9 @@ void EditorLayer::ShowMenuBar() {
 
     static bool focusName = false;
 
-    if (openNewScene) {
+    if (createNewScene) {
         ImGui::OpenPopup("##new_scene");
-        openNewScene = false;
+        createNewScene = false;
         focusName = true;
     }
 
@@ -156,9 +175,10 @@ void EditorLayer::ShowMenuBar() {
         bool confirm = ImGui::InputText("##name", sceneName, sizeof(sceneName),
             ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::Spacing();
+
         if (ImGui::Button("Create", ImVec2(126, 0)) || confirm) {
-            if (strlen(sceneName) > 0) {
-                SceneController::newScene(sceneName);
+            if (strlen(sceneName) > 0 &&
+                SceneController::newScene(sceneName, fileManager.getCurrentDirectory())) {
                 sceneName[0] = '\0';
                 ImGui::CloseCurrentPopup();
             }
@@ -166,6 +186,62 @@ void EditorLayer::ShowMenuBar() {
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(126, 0))) {
             sceneName[0] = '\0';
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (createNewProject) {
+        ImGui::OpenPopup("##new_project");
+        createNewProject = false;
+        focusName = true;
+    }
+
+    if (ImGui::BeginPopupModal("##new_project", nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
+
+        static bool folderSelected = false;
+        static std::filesystem::path outFolder;
+        if (!folderSelected) {
+            outFolder.clear();
+            FileDialog::pickFolder(WindowController::getApplicationWindow(), outFolder);
+            folderSelected = std::filesystem::is_directory(outFolder);
+        }
+
+        static char projectName[128] = "";
+        ImGui::Text("Project name");
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(260.0f);
+        if (focusName) {
+            ImGui::SetKeyboardFocusHere();
+            focusName = false;
+        }
+        bool confirm = ImGui::InputText("##name", projectName, sizeof(projectName),
+            ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::Spacing();
+
+        if (ImGui::Button("Create", ImVec2(126, 0)) || confirm) {
+            if (strlen(projectName) > 0) {
+                std::filesystem::path projectPath = outFolder / std::string(projectName);
+                projectPath = std::filesystem::weakly_canonical(projectPath);
+
+                bool created = std::filesystem::create_directory(projectPath);
+
+                bool projectCreated = ProjectController::create(projectPath, projectName);
+                if (projectCreated) {
+                    initFileManager(ProjectController::getProjectRoot());
+                    WindowController::addWindowSuffix(projectName);
+                    projectName[0] = '\0';
+                    folderSelected = false;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(126, 0))) {
+            projectName[0] = '\0';
+            folderSelected = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -360,14 +436,16 @@ void EditorLayer::ShowInspectorPanel() {
             if (const ImGuiPayload* pl =
                 ImGui::AcceptDragDropPayload(FileManagerPanel::payload)) {
                 std::string path(static_cast<const char*>(pl->Data), pl->DataSize - 1);
-                std::string filename = std::filesystem::path(path).filename().string();
-                switch (payload.type) {
-                case PayloadType::Mesh:
-                    AssetController::setModel(entityID, filename);
-                    break;
-                case PayloadType::Texture:
-                    AssetController::setTexture(entityID, groupIdx, payloadIdx, filename);
-                    break;
+                std::string assetName;
+                if (AssetController::getAssetName(std::filesystem::u8path(path), assetName)) {
+                    switch (payload.type) {
+                    case PayloadType::Mesh:
+                        AssetController::setModel(entityID, assetName);
+                        break;
+                    case PayloadType::Texture:
+                        AssetController::setTexture(entityID, groupIdx, payloadIdx, assetName);
+                        break;
+                    }
                 }
             }
             ImGui::EndDragDropTarget();
@@ -397,7 +475,7 @@ void EditorLayer::ShowInspectorPanel() {
         if (const ImGuiPayload* pl =
             ImGui::AcceptDragDropPayload(FileManagerPanel::scriptPayload)) {
             std::string path(static_cast<const char*>(pl->Data), pl->DataSize - 1);
-            std::string scriptName = std::filesystem::path(path).stem().string();
+            std::string scriptName = std::filesystem::u8path(path).stem().string();
             ComponentController::createAndBindComponent(scriptName, entityID);
         }
         ImGui::EndDragDropTarget();
@@ -477,20 +555,15 @@ void EditorLayer::ShowInspectorPanel() {
 
         ImGui::Separator();
 
-        auto scriptNames = fileManager.getScriptNames();
+        const std::vector<std::string>& scriptNames = ComponentController::getAvailableScriptNames();
         if (scriptNames.empty()) {
             ImGui::TextDisabled("No scripts found");
             ImGui::TextDisabled("(add scripts via File Manager > Scripts tab)");
         }
         else if (ImGui::BeginMenu("Script")) {
-            for (auto& scriptName : scriptNames) {
-                size_t dot = scriptName.find_last_of('.');
-                if (dot == std::string::npos) continue;
-                if (scriptName.substr(dot) != ".h") continue;
-
-                std::string base = scriptName.substr(0, dot);
-                if (ImGui::MenuItem(base.c_str()))
-                    ComponentController::createAndBindComponent(base, entityID);
+            for (const std::string& scriptName : scriptNames) {
+                if (ImGui::MenuItem(scriptName.c_str()))
+                    ComponentController::createAndBindComponent(scriptName, entityID);
             }
             ImGui::EndMenu();
         }

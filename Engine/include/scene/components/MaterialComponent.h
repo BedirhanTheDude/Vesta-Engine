@@ -25,8 +25,8 @@ public:
     void setMaterial(int index, std::shared_ptr<Material> mat);
     void setMaterials(const std::vector<std::shared_ptr<Material>>& materials);
 
-    void serialize(Archive& arch) const;
-    void deserialize(const Archive& arch);
+    void serialize(Archive& arch) const override;
+    void deserialize(const Archive& arch) override;
 
     void addMaterial(std::shared_ptr<Material> mat);
     void addDefaultMaterial();

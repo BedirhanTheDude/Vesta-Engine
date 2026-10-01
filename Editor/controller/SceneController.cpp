@@ -3,33 +3,55 @@
 
 #include <scene/Scene.h>
 #include <core/Application.h>
+#include <core/Project.h>
 
-void SceneController::newScene(const std::string& name) {
+#include <iostream>
+#include <system_error>
+
+bool SceneController::newScene(const std::string& name, const std::filesystem::path& directory) {
+	std::filesystem::path file = directory / std::filesystem::u8path(name + Project::sceneExtension);
+
+	std::string relativePath;
+	if (!Project::toRelative(file, relativePath)) {
+		std::cerr << "[Error] New scene " << file << " would be outside the project\n";
+		return false;
+	}
+
+	std::error_code ec;
+	if (std::filesystem::exists(file, ec)) {
+		std::cerr << "[Error] " << file << " already exists\n";
+		return false;
+	}
+
 	Scene* scene = getCurrentScene();
-	scene->renameScene(name);
-	scene->clear();
+	scene->newScene(name);
+	scene->setScenePath(relativePath);
 
-	Scene::createDefaultScene(*scene);
+	return true;
 }
 
-void SceneController::loadScene(const std::string& name, bool temp) {
-	Scene* scene = getCurrentScene();
-	scene->renameScene(name);
-	scene->clear();
+bool SceneController::openScene(const std::filesystem::path& sceneFile) {
+	std::string relativePath;
+	if (!Project::toRelative(sceneFile, relativePath)) {
+		std::cerr << "[Error] " << sceneFile << " is not inside the project\n";
+		return false;
+	}
 
-	SceneSerializer::load(*scene, temp);
+	return getCurrentScene()->openScene(relativePath);
 }
 
 void SceneController::loadScene(bool temp) {
 	Scene* scene = getCurrentScene();
-	scene->clear();
 
 	SceneSerializer::load(*scene, temp);
 }
 
 void SceneController::saveScene(bool temp) {
 	Scene* scene = getCurrentScene();
-	
+
+	if (!temp && scene->getScenePath().empty())
+		scene->setScenePath(scene->getSceneName() + Project::sceneExtension);
+
 	SceneSerializer::save(*scene, temp);
 }
 
@@ -60,7 +82,7 @@ void SceneController::stopScene() {
 	Scene* scene = getCurrentScene();
 
 	scene->isPlaying = false;
-	loadScene(scene->getSceneName(), true);
+	loadScene(true);
 }
 
 bool SceneController::sceneExists() {

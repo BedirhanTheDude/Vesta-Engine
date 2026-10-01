@@ -12,7 +12,7 @@ class Scene;
 class Archive;
 
 // Base class for user-level scripts
-class BehaviourComponent : public Component, public Serializable, public PropertyHolder,
+class BehaviourComponent : public Component, public PropertyHolder,
     public CallbackPropertyHolder, public PayloadHolder {
 public:
     friend class Scene;

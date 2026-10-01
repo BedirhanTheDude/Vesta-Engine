@@ -8,12 +8,16 @@
 #include <stdexcept>
 #include <filesystem>
 
-ShaderProgram::ShaderProgram(const std::string& name) {
+ShaderProgram::ShaderProgram(const std::string& name, const std::filesystem::path& basePath) {
 	this->name = name;
 
-	std::filesystem::path shaderBase = std::filesystem::current_path() / "assets" / "shaders";
-	std::string vertexSource = readFile(shaderBase / (name + ".vert"));
-	std::string fragmentSource = readFile(shaderBase / (name + ".frag"));
+	std::filesystem::path vertexPath = basePath;
+	std::filesystem::path fragmentPath = basePath;
+	vertexPath += ".vert";
+	fragmentPath += ".frag";
+
+	std::string vertexSource = readFile(vertexPath);
+	std::string fragmentSource = readFile(fragmentPath);
 
 	unsigned int vertexShader   = compileShader(GL_VERTEX_SHADER, vertexSource);
 	unsigned int fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
@@ -35,6 +39,10 @@ ShaderProgram::ShaderProgram(const std::string& name) {
 
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
+}
+
+std::filesystem::path ShaderProgram::getEngineShaderDirectory() {
+	return std::filesystem::u8path(VESTA_ENGINE_SHADER_DIR);
 }
 
 ShaderProgram::~ShaderProgram() {

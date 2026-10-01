@@ -50,7 +50,7 @@ public:
     static void registerBuiltIn(const std::string& name, Creator creator, ComponentOps ops);
     static void registerScript(const std::string& name, Creator creator, ComponentOps ops);
     static void create(const std::string& name, Entity& entity, const Archive& arch);
-    static void clearScriptRegistry() { getScriptRegistry().clear(); }
+    static void clearScriptRegistry();
 
     // removes the component with this UID (onDetach included), does nothing if the entity has none
     static void remove(unsigned int UID, Entity& entity);
@@ -66,9 +66,9 @@ public:
     static const std::vector<std::string>& getBuiltInNames();
     static const std::vector<std::string>& getScriptNames();
 
-    static bool scriptCacheValid; // gets invalidated by script register inline lambdas at load time
-
 private:
+    static bool scriptCacheValid;
+
     struct Entry {
         Creator creator;
         ComponentOps ops;

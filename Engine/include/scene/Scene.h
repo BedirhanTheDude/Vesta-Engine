@@ -28,10 +28,13 @@ public:
 
     void renameScene(const std::string& name) { sceneName = name; }
     void newScene(const std::string& sceneName = "scene");
-    void openScene(const std::string& sceneName);
+    bool openScene(const std::string& relativeScenePath);
 
     std::string getSceneName() const { return sceneName; }
     void setSceneName(const std::string& name) { sceneName = name; }
+
+    const std::string& getScenePath() const { return scenePath; }
+    void setScenePath(const std::string& relativeScenePath) { scenePath = relativeScenePath; }
 
     Entity createEntity(const std::string& name);
     Entity createEntity(const std::string& name, const Entity& parent);
@@ -99,6 +102,7 @@ private:
     std::unique_ptr<PhysicsWorld> physicsWorld;
 
     std::string sceneName;
+    std::string scenePath;
 
     // "no camera" is entityId == generation == UINT32_MAX, same sentinel values as
     // ECS::INVALID_ENTITY_HANDLE; stored as raw fields (not ECS::EntityHandle) so this

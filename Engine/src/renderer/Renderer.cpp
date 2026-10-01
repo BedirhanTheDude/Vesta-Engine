@@ -111,7 +111,7 @@ static void applyFrameUniforms(const ShaderProgram& shader, const FrameData& fra
 Renderer::Renderer() {
 	initShadowMap();
 
-	depthShader = std::make_unique<ShaderProgram>("depth");
+	depthShader = std::make_unique<ShaderProgram>("depth", ShaderProgram::getEngineShaderDirectory() / "depth");
 }
 
 Renderer::~Renderer() {

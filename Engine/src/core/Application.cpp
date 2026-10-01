@@ -1,19 +1,20 @@
+#include <GLFW/glfw3.h>
+
 #include <core/Application.h>
+#include <core/Project.h>
 
 #include <scene/Scene.h>
 #include <renderer/Renderer.h>
 
-#include <persistance/SceneSerializer.h>
-
-// definitions for the private static members declared in Application.h
 std::unique_ptr<Scene> Application::scene;
 std::unique_ptr<Renderer> Application::renderer;
 
-Scene* Application::newScene(const std::string& name) {
-	scene = std::unique_ptr<Scene>(new Scene(name));
+GLFWwindow* Application::window = nullptr;
 
-	bool loaded = SceneSerializer::load(*scene, false);
-	if (!loaded)
+Scene* Application::newScene(const std::string& relativeScenePath) {
+	scene = std::unique_ptr<Scene>(new Scene());
+
+	if (Project::isOpen() && (relativeScenePath.empty() || !scene->openScene(relativeScenePath)))
 		Scene::createDefaultScene(*scene);
 
 	return scene.get();
@@ -30,6 +31,14 @@ Renderer* Application::newRenderer() {
 
 Renderer* Application::getCurrentRenderer() {
 	return renderer.get();
+}
+
+void Application::setWindow(GLFWwindow* w) {
+	window = w;
+}
+
+GLFWwindow* Application::getWindow() {
+	return window;
 }
 
 void Application::shutdown() {

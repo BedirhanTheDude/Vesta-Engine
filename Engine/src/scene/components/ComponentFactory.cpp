@@ -26,6 +26,13 @@ void ComponentFactory::registerBuiltIn(const std::string& name, Creator creator,
 
 void ComponentFactory::registerScript(const std::string& name, Creator creator, ComponentOps ops) {
     ComponentFactory::getScriptRegistry()[name] = { std::move(creator), ops };
+    scriptCacheValid = false;
+}
+
+// out of line so the registry is always Engine.dll's single copy
+void ComponentFactory::clearScriptRegistry() {
+    getScriptRegistry().clear();
+    scriptCacheValid = false;
 }
 
 void ComponentFactory::create(const std::string& name, Entity& entity, const Archive& arch) {

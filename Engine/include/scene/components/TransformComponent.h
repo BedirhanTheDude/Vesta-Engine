@@ -45,6 +45,10 @@ public:
 	glm::quat getWorldRotationQuat() const;
 	glm::vec3 getWorldScale() const;
 
+	// Transform serialization/deserialization is tied to entity serialization/deserialization since it always exists
+	void serialize(Archive& arch) const override {};
+	void deserialize(const Archive& arch) override {};
+
 	// The invalid Entity() if there is no parent. A parent that was removed reports isAlive() == false.
 	Entity getParent() const;
 	std::vector<Entity> getChildren() const;

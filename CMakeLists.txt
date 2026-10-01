@@ -70,6 +70,7 @@ set(CORE_SRC
     Engine/src/core/Application.cpp
     Engine/src/core/AssetManager.cpp
     Engine/src/core/Input.cpp
+    Engine/src/core/Project.cpp
 )
 
 set(ECS_SRC
@@ -107,8 +108,14 @@ set(CONTROLLER_SRC
     Editor/controller/EditorSelectionController.cpp
     Editor/controller/EntityController.cpp
     Editor/controller/FileTypeController.cpp
+    Editor/controller/ProjectController.cpp
     Editor/controller/SceneController.cpp
     Editor/controller/TransformController.cpp
+    Editor/controller/WindowController.cpp
+)
+
+set(PLATFORM_SRC
+    Editor/platform/FileDialog.cpp
 )
 
 set(IMGUI_SRC
@@ -168,12 +175,10 @@ target_compile_definitions(Engine
     INTERFACE GLAD_GLAPI_EXPORT
 )
 
-target_compile_definitions(Engine PUBLIC
-    SHADER_PATH=u8"${CMAKE_SOURCE_DIR}/assets/shaders/"
-    MODEL_PATH=u8"${CMAKE_SOURCE_DIR}/assets/models/"
-    SCENES_PATH=u8"${CMAKE_SOURCE_DIR}/assets/scenes/"
-    ASSETS_PATH=u8"${CMAKE_SOURCE_DIR}/assets/"
-    SCRIPTS_PATH="${CMAKE_SOURCE_DIR}/Sandbox/scripts/"
+# built-in shaders are read straight from the source tree, so edits don't need a copy step
+# NOTE: this makes the exe depend on the source tree, a distributable build has to copy them next to the exe instead
+target_compile_definitions(Engine PRIVATE
+    VESTA_ENGINE_SHADER_DIR=u8"${CMAKE_SOURCE_DIR}/Engine/src/renderer/shaders/"
 )
 
 if (MSVC)
@@ -184,6 +189,7 @@ endif()
 add_library(Editor STATIC
     ${GUI_SRC}
     ${CONTROLLER_SRC}
+    ${PLATFORM_SRC}
     ${IMGUI_SRC}
 )
 
@@ -197,11 +203,14 @@ target_include_directories(Editor PUBLIC
 target_link_libraries(Editor PUBLIC Engine)
 
 # Editor (Sandbox.exe)
-file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY Sandbox/icon.png DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY Sandbox/src/scripts DESTINATION ${CMAKE_BINARY_DIR})
 
 add_executable(Sandbox Sandbox/src/main.cpp)
+
+# opened when there is no project on the command line and no last opened project
+target_compile_definitions(Sandbox PRIVATE
+    VESTA_SAMPLE_PROJECT=u8"${CMAKE_SOURCE_DIR}/SampleProject"
+)
 
 if(WIN32)
     target_sources(Sandbox PRIVATE Sandbox/resources.rc)
@@ -240,7 +249,8 @@ add_custom_command(TARGET Sandbox POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/glm/glm $<TARGET_FILE_DIR:Sandbox>/include/glm
 )
 
-file(GLOB_RECURSE SCRIPT_HEADERS CONFIGURE_DEPENDS Sandbox/src/scripts/*.h)
+file(GLOB_RECURSE SCRIPT_HEADERS CONFIGURE_DEPENDS SampleProject/*.h)
+list(FILTER SCRIPT_HEADERS EXCLUDE REGEX "/\\.[^/]*/")
 if(SCRIPT_HEADERS)
     add_library(ScriptsIntelliSense EXCLUDE_FROM_ALL ${SCRIPT_HEADERS})
     set_target_properties(ScriptsIntelliSense PROPERTIES LINKER_LANGUAGE CXX)

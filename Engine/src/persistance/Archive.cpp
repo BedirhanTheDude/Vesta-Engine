@@ -30,7 +30,7 @@ namespace {
         Mat4 = 14,
     };
 
-    constexpr char     MAGIC[4] = { 'V', 'E', 'R', 'O' };
+    constexpr char     MAGIC[4] = { 'V', 'E', 'A', 'R' };
     constexpr uint8_t  VERSION = 1;
     constexpr uint8_t  ENDIAN_LITTLE = 0; // native endian
 
@@ -332,7 +332,7 @@ bool Archive::parseFromBuffer(const std::string& bytes) {
     return true;
 }
 
-bool Archive::saveToFile(const std::string& path) const {
+bool Archive::saveToFile(const std::filesystem::path& path) const {
     std::string bytes;
     if (!serializeToBuffer(bytes)) return false;
     std::ofstream f(path, std::ios::binary);
@@ -341,7 +341,7 @@ bool Archive::saveToFile(const std::string& path) const {
     return static_cast<bool>(f);
 }
 
-bool Archive::loadFromFile(const std::string& path) {
+bool Archive::loadFromFile(const std::filesystem::path& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
     std::string bytes((std::istreambuf_iterator<char>(f)),

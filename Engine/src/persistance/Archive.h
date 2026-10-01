@@ -3,12 +3,13 @@
 #include <string>
 #include <cstdint>
 #include <cstddef>
+#include <filesystem>
 #include <glm/fwd.hpp>
 
 // binary serialization interface
 // 
 // On-disk layout:
-//   File   : [magic 'VREA'][version u8][endianFlag u8][root object]
+//   File   : [magic 'VEAR'][version u8][endianFlag u8][root object]
 //   Value  : [tag u8][payload]
 //   Scalar : fixed-size payload (int=4, float=4, vec3=12, ...)
 //   String : [len u32][bytes]
@@ -30,8 +31,8 @@ public:
     Archive& operator=(const Archive&) = delete;
 
     // file io
-    bool saveToFile(const std::string& path) const;
-    bool loadFromFile(const std::string& path);
+    bool saveToFile(const std::filesystem::path& path) const;
+    bool loadFromFile(const std::filesystem::path& path);
 
     // raw buffer
     bool serializeToBuffer(std::string& outBytes) const;

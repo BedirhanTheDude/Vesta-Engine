@@ -90,6 +90,10 @@ const std::vector<std::string>& ComponentController::getAvailableComponentNames(
 	return names;
 }
 
+const std::vector<std::string>& ComponentController::getAvailableScriptNames() {
+	return ComponentFactory::getScriptNames();
+}
+
 std::vector<unsigned int> ComponentController::getEntityComponentUIDs(unsigned int entityID) {
 	Entity entity = EntityController::resolveEntity(entityID);
 	if (!entity.isValid()) return std::vector<unsigned int>();

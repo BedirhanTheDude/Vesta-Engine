@@ -49,16 +49,11 @@ dependencies/compiler/*.dll
 
 external
 
-scripts.dll
-temp_scripts.dll
-scripts.lib
-scripts.exp
-scripts/ScriptsDLL.cpp
-scripts/*.model.cache
-assets/models/OBJCache/
+# project cache (script build, mesh caches, temp scene)
+.vesta/
 
-assets/scenes/*_temp.vrea
-start.dat
+# editor state next to the exe
+editor.dat
 
 *.log
 *.dmp

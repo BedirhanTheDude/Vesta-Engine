@@ -16,15 +16,15 @@ struct FileNode {
 
 class FileManagerPanel {
 public:
-    void init(const std::string& rootPath);
-    void initScriptsPath(const std::string& path);
+    // rootPath is the project root
+    void init(const std::filesystem::path& rootPath);
     void show(bool* open = nullptr);
 
     static constexpr const char* payload = "FM_ASSET_PATH";
     static constexpr const char* scriptPayload = "FM_SCRIPT_PATH";
 
     const std::filesystem::path& getCurrentDirectory() const { return currentDir; }
-    std::vector<std::string> getScriptNames() const;
+    const std::vector<std::string>& getScriptNames() const { return scriptNames; }
 
 private:
     void drawFolderTree(FileNode& node);
@@ -71,8 +71,8 @@ private:
     enum class Tab { Assets, Scripts };
     Tab activeTab = Tab::Assets;
 
-    std::filesystem::path scriptsPath;
     std::vector<FileNode> scriptItems;
+    std::vector<std::string> scriptNames;
 
     void refreshScripts();
     void drawScriptsTab();

@@ -12,8 +12,12 @@
 
 class ShaderProgram {
 public:
-	ShaderProgram(const std::string& name);
+	// basePath is the shader's .vert/.frag pair without the extension
+	ShaderProgram(const std::string& name, const std::filesystem::path& basePath);
 	~ShaderProgram();
+
+	// directory of the built-in shaders the renderer itself uses (lit, depth, ...), lives in the engine source tree
+	static std::filesystem::path getEngineShaderDirectory();
 
 	// owns the GL program and views into its own uniform name storage
 	ShaderProgram(const ShaderProgram&) = delete;

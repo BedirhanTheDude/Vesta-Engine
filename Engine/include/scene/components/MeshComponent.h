@@ -22,8 +22,8 @@ public:
 	void setPrimitive(unsigned int primitive);
 	unsigned int getPrimitive() const;
 
-	void serialize(Archive& arch) const;
-	void deserialize(const Archive& arch);
+	void serialize(Archive& arch) const override;
+	void deserialize(const Archive& arch) override;
 
 	bool onAttach() { return true; }
 	void onDetach() {}

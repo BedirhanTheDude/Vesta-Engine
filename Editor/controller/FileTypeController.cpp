@@ -1,5 +1,7 @@
 #include <controller/FileTypeController.h>
 
+#include <core/Project.h>
+
 #include <cstdlib>
 
 bool FileTypeController::isImageFile(const std::filesystem::path& p) {
@@ -18,7 +20,11 @@ bool FileTypeController::isMeshFile(const std::filesystem::path& p) {
 }
 
 bool FileTypeController::isSceneFile(const std::filesystem::path& p) {
-    return p.extension().string() == ".scene" || p.extension().string() == ".vrea";
+    return p.extension() == Project::sceneExtension;
+}
+
+bool FileTypeController::isHiddenDirectory(const std::filesystem::path& p) {
+    return Project::isIgnoredDirectory(p);
 }
 
 bool FileTypeController::isShaderFile(const std::filesystem::path& p) {
@@ -50,11 +56,14 @@ std::string FileTypeController::truncateForDisplay(const std::string& name, size
 
 void FileTypeController::revealInExplorer(const std::filesystem::path& target) {
 #ifdef _WIN32
-    std::string cmd = "explorer \"" + target.string() + "\"";
+    // wide so non-ANSI paths survive
+    std::wstring cmd = L"explorer \"" + target.wstring() + L"\"";
+    _wsystem(cmd.c_str());
 #elif __APPLE__
     std::string cmd = "open \"" + target.string() + "\"";
+    system(cmd.c_str());
 #else
     std::string cmd = "xdg-open \"" + target.string() + "\"";
-#endif
     system(cmd.c_str());
+#endif
 }

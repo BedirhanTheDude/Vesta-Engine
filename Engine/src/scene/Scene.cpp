@@ -26,6 +26,7 @@
 #include <ecs/ComponentPoolRegistry.h>
 
 #include <utility>
+#include <filesystem>
 #include <cassert>
 #include <cstdint>
 #include <algorithm>
@@ -67,15 +68,24 @@ Scene::~Scene() {
 void Scene::newScene(const std::string& sceneName) {
 	clear();
 	this->sceneName = sceneName;
+	scenePath.clear();
 
 	createDefaultScene(*this);
 }
 
-void Scene::openScene(const std::string& sceneName) {
-	clear();
-	this->sceneName = sceneName;
+bool Scene::openScene(const std::string& relativeScenePath) {
+	std::string previousName = sceneName;
+	std::string previousPath = scenePath;
 
-	SceneSerializer::load(*this);
+	scenePath = relativeScenePath;
+	sceneName = std::filesystem::u8path(relativeScenePath).stem().string();
+
+	if (SceneSerializer::load(*this)) return true;
+
+	// load leaves the current scene untouched on failure, it keeps its own name and file
+	sceneName = std::move(previousName);
+	scenePath = std::move(previousPath);
+	return false;
 }
 
 Entity Scene::createEntity(const std::string& name) {
@@ -523,6 +533,8 @@ void Scene::clear() {
 
 	entityManager->reset(); // its OWN reset function not std::unique_ptr::reset()
 	componentRegistry->reset(); // again
+
+	isPlaying = false;
 }
 
 void Scene::ensureSparseSize(const ECS::EntityHandle& handle) {

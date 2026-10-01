@@ -13,7 +13,13 @@
 #include <core/AssetManager.h>
 #include <core/Application.h>
 
+#include <core/Project.h>
+
 #include <memory>
+
+bool AssetController::getAssetName(const std::filesystem::path& file, std::string& outName) {
+	return Project::toRelative(file, outName);
+}
 
 bool AssetController::loadMesh(const std::string& meshName) {
 	return AssetManager::loadMesh(meshName);
