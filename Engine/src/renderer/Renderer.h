@@ -10,11 +10,14 @@ class Scene;
 
 struct MeshData;
 struct MaterialData;
-struct DirectionalLight;
 
 struct PointLightGPU;	// defined in Renderer.cpp
 struct FrameData;		// this too
 struct TransparentDraw; // this too...
+
+namespace RenderingSystem {
+	struct SceneRenderView;
+}
 
 struct ShadowParams {
 	glm::mat4 lightSpaceMatrix;
@@ -32,6 +35,9 @@ public:
 	void render(const Scene& scene, const glm::mat4& viewOverride, const glm::mat4& projOverride);
 
 private:
+	void render(const RenderingSystem::SceneRenderView* renderView,
+		const glm::mat4& view, const glm::mat4& proj);
+
 	void initShadowMap();
 
 	// uploads point light data to GPU memory

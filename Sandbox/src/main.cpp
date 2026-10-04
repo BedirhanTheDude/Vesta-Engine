@@ -1,10 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// TODO: Remove these includes that are for IntelliSense's pleasure
-#include <ecs/ComponentPoolRegistry.h>
-#include <ecs/ComponentPool.h>
-
 // stb implementation lives in Engine (stb_impl.cpp); just use the declarations here.
 #include <stb_image.h>
 

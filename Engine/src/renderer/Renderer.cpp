@@ -8,19 +8,10 @@
 #include <scene/Entity.h>
 
 #include <scene/components/Transform.h>
-#include <scene/components/Camera.h>
 #include <scene/components/MeshData.h>
 #include <scene/components/MaterialData.h>
-#include <scene/components/DirectionalLight.h>
-#include <scene/components/PointLight.h>
 
-#include <scene/system/TransformSystem.h>
-#include <scene/system/CameraSystem.h>
-#include <scene/system/DirectionalLightSystem.h>
-
-#include <ecs/EntityHandle.h>
-#include <ecs/ComponentPool.h>
-#include <ecs/ComponentPoolRegistry.h>
+#include <scene/system/RenderingSystem.h>
 
 #include <renderer/ShaderProgram.h>
 #include <renderer/Mesh.h>
@@ -34,8 +25,8 @@
 // DO NOT change order of this struct pls, memory alignment may break
 struct PointLightGPU {
 	glm::vec3 position;
-	float ambientIntensity;
 	glm::vec3 color;
+	float ambientIntensity;
 	float diffuseIntensity;
 	float specularIntensity;
 	float constant;
@@ -61,10 +52,9 @@ struct FrameData {
 	glm::mat4 proj;
 	glm::vec3 cameraPosition;
 
-	const DirectionalLight* dirLight;
-	glm::vec3 dirLightDirection;
+	const RenderingSystem::DirectionalLightData* dirLightData;
 
-	int pointLightCount;
+	uint32_t pointLightCount;
 	ShadowParams shadow;
 
 	uint64_t epoch; // identifies this render() call, a program that already saw it has the values above
@@ -78,7 +68,7 @@ struct TransparentDraw {
 	float distance;
 	const MeshData* mesh;
 	const MaterialData* materials;
-	Transform* transform;
+	const glm::mat4* model;
 };
 
 static const int SHADOW_TEXTURE_UNIT = 4;
@@ -93,13 +83,13 @@ static void applyFrameUniforms(const ShaderProgram& shader, const FrameData& fra
 	shader.setFloat("uShadowDepthRange", frame.shadow.depthRange);
 	shader.setInt("uShadowMap", SHADOW_TEXTURE_UNIT);
 
-	if (frame.dirLight) {
+	if (frame.dirLightData->hasDirLight) {
 		shader.setBool("uHasDirectionalLight", true);
-		shader.setVec3("uDirectionalLight.direction", frame.dirLightDirection);
-		shader.setVec3("uDirectionalLight.color", frame.dirLight->color);
-		shader.setFloat("uDirectionalLight.ambientIntensity", frame.dirLight->ambientStrength);
-		shader.setFloat("uDirectionalLight.diffuseIntensity", frame.dirLight->diffuseStrength);
-		shader.setFloat("uDirectionalLight.specularIntensity", frame.dirLight->specularStrength);
+		shader.setVec3("uDirectionalLight.direction", frame.dirLightData->direction);
+		shader.setVec3("uDirectionalLight.color", frame.dirLightData->color);
+		shader.setFloat("uDirectionalLight.ambientIntensity", frame.dirLightData->ambientStrength);
+		shader.setFloat("uDirectionalLight.diffuseIntensity", frame.dirLightData->diffuseStrength);
+		shader.setFloat("uDirectionalLight.specularIntensity", frame.dirLightData->specularStrength);
 	}
 	else {
 		shader.setBool("uHasDirectionalLight", false);
@@ -147,81 +137,58 @@ void Renderer::initShadowMap() {
 }
 
 void Renderer::render(const Scene& scene) {
-	Entity cameraEntity = scene.getActiveCameraEntity();
-	if (!cameraEntity.isValid()) return;
-
-	ECS::ComponentPoolRegistry* registry = scene.getComponentPoolRegistry();
-
-	Camera* camera = registry->getCameras().get(cameraEntity.getHandle());
-	Transform* cameraTransform = registry->getTransforms().get(cameraEntity.getHandle());
-	if (!camera || !cameraTransform) return;
-
-	// rendering only refreshes the transforms' lazily cached (mutable) matrices, it never edits the scene
-	Scene* mutableScene = const_cast<Scene*>(&scene);
-
-	render(scene, CameraSystem::getViewMatrix(*cameraTransform, mutableScene),
-		CameraSystem::getProjectionMatrix(*camera));
+	const RenderingSystem::SceneRenderView* renderView = RenderingSystem::getSceneRenderView(scene);
+	glm::mat4 view = RenderingSystem::getActiveCameraView(scene);
+	glm::mat4 proj = RenderingSystem::getActiveCameraProj(scene);
+	
+	render(renderView, view, proj);
 }
 
 void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4& proj) {
+	const RenderingSystem::SceneRenderView* renderView = RenderingSystem::getSceneRenderView(scene);
+	render(renderView, view, proj);
+}
+
+void Renderer::render(const RenderingSystem::SceneRenderView* renderView,
+	const glm::mat4& view, const glm::mat4& proj) {
+	if (!renderView->isRenderable) return;
+
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
 
 	GLint previousFBO;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
 
-	Scene* mutableScene = const_cast<Scene*>(&scene); // see render(const Scene&), this is safe pls trust
-
-	ECS::ComponentPoolRegistry* registry = scene.getComponentPoolRegistry();
-	ECS::ComponentPool<Transform>& transforms = registry->getTransforms();
-	ECS::ComponentPool<MaterialData>& materials = registry->getMaterials();
-
 	glm::mat4 inverseView = glm::inverse(view);
 	glm::vec3 camPos = glm::vec3(inverseView[3]);
 	glm::vec3 camForward = -glm::normalize(glm::vec3(inverseView[2]));
-
-	// no structural pool change happens while rendering, so the pointers gathered here stay valid for the whole frame
-	const DirectionalLight* dirLight = nullptr;
-	const Transform* dirLightTransform = nullptr;
-	glm::vec3 dirLightDirection(0.0f, 0.0f, -1.0f);
-
-	for (auto item : registry->getDirectionalLights()) {
-		Transform* transform = transforms.get(item.entity);
-		if (!transform) continue;
-
-		dirLight = &item.component;
-		dirLightTransform = transform;
-		dirLightDirection = DirectionalLightSystem::getDirection(*transform);
-		break;
-	}
 
 	// the members keep their capacity between frames, nothing is allocated here in the steady state
 	std::vector<PointLightGPU>& pointLights = pointLightScratch;
 	pointLights.clear();
 
-	for (auto item : registry->getPointLights()) {
-		Transform* transform = transforms.get(item.entity);
-		if (!transform) continue;
-
+	for (auto item : renderView->pointLightData) {
 		PointLightGPU pointLight;
-		pointLight.position = TransformSystem::getWorldPosition(*transform);
-		pointLight.ambientIntensity = item.component.ambientStrength;
-		pointLight.color = item.component.color;
-		pointLight.diffuseIntensity = item.component.diffuseStrength;
-		pointLight.specularIntensity = item.component.specularStrength;
-		pointLight.constant = item.component.constant;
-		pointLight.linear = item.component.linear;
-		pointLight.quadratic = item.component.quadratic;
+		pointLight.position = item.position;
+		pointLight.ambientIntensity = item.ambientIntensity;
+		pointLight.color = item.color;
+		pointLight.diffuseIntensity = item.diffuseIntensity;
+		pointLight.specularIntensity = item.specularIntensity;
+		pointLight.constant = item.constant;
+		pointLight.linear = item.linear;
+		pointLight.quadratic = item.quadratic;
 
 		pointLights.push_back(pointLight);
 	}
 
+	const RenderingSystem::DirectionalLightData& dirLightData = renderView->dirLightData;
+
 	ShadowParams shadow{ glm::mat4(1.0f), 1.0f, 1.0f };
 
-	if (dirLight) {
-		DirectionalLightSystem::ShadowFrustum frustum = DirectionalLightSystem::getShadowFrustum(*dirLight);
+	if (dirLightData.hasDirLight) {
+		const auto frustum = renderView->shadowData.frustum;
 
-		shadow.lightSpaceMatrix = DirectionalLightSystem::getLightSpaceMatrix(*dirLight, *dirLightTransform, camPos, camForward);
+		shadow.lightSpaceMatrix = std::move(renderView->shadowData.lightSpaceMatrix);
 		shadow.texelWorldSize = frustum.size / static_cast<float>(SHADOW_WIDTH);
 		shadow.depthRange = frustum.farPlane - frustum.nearPlane;
 
@@ -233,13 +200,8 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 		depthShader->use();
 		depthShader->setMat4("uLightSpaceMatrix", shadow.lightSpaceMatrix);
 
-		for (auto item : registry->getMeshes()) {
-			if (!item.component.mesh || !materials.has(item.entity)) continue;
-
-			Transform* transform = transforms.get(item.entity);
-			if (!transform) continue;
-
-			drawEntityDepth(TransformSystem::getMatrix(*transform, mutableScene), item.component);
+		for (uint32_t i = 0; i < renderView->entityCount; ++i) {
+			drawEntityDepth(renderView->models.at(i), renderView->meshData.at(i));
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
@@ -260,8 +222,7 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 	frame.view = view;
 	frame.proj = proj;
 	frame.cameraPosition = camPos;
-	frame.dirLight = dirLight;
-	frame.dirLightDirection = dirLightDirection;
+	frame.dirLightData = &renderView->dirLightData;
 	frame.pointLightCount = static_cast<int>(pointLights.size());
 	frame.shadow = shadow;
 
@@ -272,16 +233,16 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
 	glActiveTexture(GL_TEXTURE0);
 
-	for (auto item : registry->getMeshes()) {
-		MaterialData* materialData = materials.get(item.entity);
-		Transform* transform = transforms.get(item.entity);
-		if (!materialData || !transform) continue;
+	for (uint32_t i = 0; i < renderView->entityCount; ++i) {
+		const MeshData& meshData = renderView->meshData.at(i);
+		const MaterialData& materialData = renderView->materialData.at(i);
+		const glm::mat4& modelMatrix = renderView->models.at(i);
 
-		drawEntity(TransformSystem::getMatrix(*transform, mutableScene), item.component, *materialData, frame, false);
+		drawEntity(modelMatrix, meshData, materialData, frame, false);
 
-		if (hasAnyTransparent(*materialData)) {
-			glm::vec3 worldPosition = TransformSystem::getWorldPosition(*transform, mutableScene);
-			transparentDraws.push_back({ glm::length(worldPosition - camPos), &item.component, materialData, transform });
+		if (hasAnyTransparent(materialData)) {
+			glm::vec3 worldPosition = modelMatrix[3];
+			transparentDraws.push_back({ glm::length(worldPosition - camPos), &meshData, &materialData, &modelMatrix });
 		}
 	}
 
@@ -294,7 +255,7 @@ void Renderer::render(const Scene& scene, const glm::mat4& view, const glm::mat4
 	glDepthMask(GL_FALSE);
 
 	for (const TransparentDraw& draw : transparentDraws) {
-		drawEntity(TransformSystem::getMatrix(*draw.transform, mutableScene), *draw.mesh, *draw.materials, frame, true);
+		drawEntity(*draw.model, *draw.mesh, *draw.materials, frame, true);
 	}
 
 	glDepthMask(GL_TRUE);

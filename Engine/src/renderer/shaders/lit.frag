@@ -10,8 +10,8 @@ struct DirectionalLight {
 
 struct PointLight {
     vec3 position;
-    float ambientIntensity;
     vec3 color;
+    float ambientIntensity;
     float diffuseIntensity;
     float specularIntensity;
     float constant;

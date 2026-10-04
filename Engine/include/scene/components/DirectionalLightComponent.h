@@ -38,11 +38,6 @@ public:
     float getShadowFar() const;
     void setShadowFar(float shadowFar);
 
-    // camForward (normalized) shifts the shadow box towards where the camera looks, see DirectionalLightSystem
-    glm::mat4 getLightSpaceMatrix(const glm::vec3& camPos, const glm::vec3& camForward = glm::vec3(0.0f)) const;
-
-    glm::vec3 getDirection() const;
-
     void serialize(Archive& arch) const override;
     void deserialize(const Archive& arch) override;
 

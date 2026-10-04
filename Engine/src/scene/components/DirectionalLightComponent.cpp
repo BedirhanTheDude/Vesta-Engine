@@ -101,19 +101,6 @@ void DirectionalLightComponent::setShadowFar(float shadowFar) {
     if (DirectionalLight* light = resolveComponent<DirectionalLight>(entity)) light->shadowFar = shadowFar;
 }
 
-glm::mat4 DirectionalLightComponent::getLightSpaceMatrix(const glm::vec3& camPos, const glm::vec3& camForward) const {
-    DirectionalLight* light = resolveComponent<DirectionalLight>(entity);
-    Transform* transform = resolveComponent<Transform>(entity);
-    if (!light || !transform) return glm::mat4(1.0f);
-
-    return DirectionalLightSystem::getLightSpaceMatrix(*light, *transform, camPos, camForward);
-}
-
-glm::vec3 DirectionalLightComponent::getDirection() const {
-    Transform* transform = resolveComponent<Transform>(entity);
-    return transform ? DirectionalLightSystem::getDirection(*transform) : glm::vec3(0.0f, 0.0f, -1.0f);
-}
-
 void DirectionalLightComponent::serialize(Archive& arch) const {
     if (DirectionalLight* light = resolveComponent<DirectionalLight>(entity))
         DirectionalLightSystem::serialize(*light, arch);

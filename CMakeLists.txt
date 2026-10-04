@@ -50,6 +50,7 @@ set(SCENE_SYSTEM_SRC
     Engine/src/scene/system/MeshSystem.cpp
     Engine/src/scene/system/PointLightSystem.cpp
     Engine/src/scene/system/RigidBodySystem.cpp
+    Engine/src/scene/system/RenderingSystem.cpp
     Engine/src/scene/system/TransformSystem.cpp
 )
 
