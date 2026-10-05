@@ -111,6 +111,7 @@ set(CONTROLLER_SRC
     Editor/controller/FileTypeController.cpp
     Editor/controller/ProjectController.cpp
     Editor/controller/SceneController.cpp
+    Editor/controller/ScriptingController.cpp
     Editor/controller/TransformController.cpp
     Editor/controller/WindowController.cpp
 )

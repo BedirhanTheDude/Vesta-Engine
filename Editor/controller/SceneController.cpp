@@ -78,11 +78,11 @@ void SceneController::playScene() {
 	scene->isPlaying = true;
 }
 
-void SceneController::stopScene() {
+void SceneController::stopScene(bool interrupt) {
 	Scene* scene = getCurrentScene();
 
 	scene->isPlaying = false;
-	loadScene(true);
+	loadScene(!interrupt); // if not interrupted load temp as usual
 }
 
 bool SceneController::sceneExists() {

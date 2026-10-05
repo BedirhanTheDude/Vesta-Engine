@@ -19,7 +19,11 @@ public:
 	void setRotation(const glm::vec3& eulerAngles);
 	void setRotation(const glm::quat& quat);
 	void rotate(const glm::vec3& eulerDelta);
+	void rotateX(float angleDegrees);
+	void rotateY(float angleDegrees);
+	void rotateZ(float angleDegrees);
 	void rotateAroundAxis(const glm::vec3& axis, float angle);
+	void rotateAroundLocalAxis(const glm::vec3& localAxis, float angle);
 
 	void setScale(const glm::vec3& scale);
 	void scaleBy(const glm::vec3& factor);

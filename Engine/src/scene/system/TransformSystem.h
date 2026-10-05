@@ -23,6 +23,7 @@ namespace TransformSystem {
 	void setRotation(Transform& transform, const glm::quat& quat, Scene* scene = nullptr);
 	void rotate(Transform& transform, const glm::vec3& eulerDeltaDegrees, Scene* scene = nullptr);
 	void rotateAroundAxis(Transform& transform, const glm::vec3& axis, float angleDegrees, Scene* scene = nullptr);
+	void rotateAroundLocalAxis(Transform& transform, const glm::vec3& locaAxis, float angleDegrees, Scene* scene = nullptr);
 
 	void setScale(Transform& transform, const glm::vec3& scale, Scene* scene = nullptr);
 	void scaleBy(Transform& transform, const glm::vec3& factor, Scene* scene = nullptr);

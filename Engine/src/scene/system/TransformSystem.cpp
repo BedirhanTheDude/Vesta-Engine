@@ -144,6 +144,13 @@ namespace TransformSystem {
         invalidate(transform, scene);
     }
 
+    void rotateAroundLocalAxis(Transform& transform, const glm::vec3& localAxis, float angleDegrees, Scene* scene) {
+        glm::mat3 rotationMatrix = getRotationMatrix(transform);
+        glm::vec3 globalAxis = rotationMatrix * localAxis; // R * V_local = V_world
+        rotateAroundAxis(transform, globalAxis, angleDegrees, scene);
+    }
+
+
     void setScale(Transform& transform, const glm::vec3& scale, Scene* scene) {
         if (!glm::all(glm::greaterThanEqual(scale, glm::vec3(0.0f))))
             return;

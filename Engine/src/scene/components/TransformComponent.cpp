@@ -42,10 +42,34 @@ void TransformComponent::rotate(const glm::vec3& eulerDeltaDegrees)
         TransformSystem::rotate(*transform, eulerDeltaDegrees, sceneOf(entity));
 }
 
+void TransformComponent::rotateX(float angleDegrees) {
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, glm::vec3(1.0f, 0.0f, 0.0f),
+            angleDegrees, sceneOf(entity));
+}
+
+void TransformComponent::rotateY(float angleDegrees) {
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, glm::vec3(0.0f, 1.0f, 0.0f),
+            angleDegrees, sceneOf(entity));
+}
+
+void TransformComponent::rotateZ(float angleDegrees) {
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, glm::vec3(0.0f, 0.0f, 1.0f),
+            angleDegrees, sceneOf(entity));
+}
+
 void TransformComponent::rotateAroundAxis(const glm::vec3& axis, float angleDegrees)
 {
     if (Transform* transform = resolveComponent<Transform>(entity))
         TransformSystem::rotateAroundAxis(*transform, axis, angleDegrees, sceneOf(entity));
+}
+
+void TransformComponent::rotateAroundLocalAxis(const glm::vec3& localAxis, float angleDegrees)
+{
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, localAxis, angleDegrees, sceneOf(entity));
 }
 
 void TransformComponent::setScale(const glm::vec3& scale)

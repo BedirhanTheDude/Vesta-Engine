@@ -21,7 +21,7 @@ namespace SceneController {
 	void removeEntity(unsigned int ID);
 
 	void playScene();
-	void stopScene();
+	void stopScene(bool interrupt = false);
 
 	bool sceneExists();
 	bool sceneIsPlaying();

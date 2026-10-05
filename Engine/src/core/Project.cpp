@@ -2,6 +2,9 @@
 
 #include <persistance/Archive.h>
 
+#include <scripting/ScriptCompiler.h>
+#include <scripting/ScriptLoader.h>
+
 #include <iostream>
 #include <system_error>
 
@@ -74,6 +77,12 @@ bool Project::open(const fs::path& rootPath) {
 	name = std::move(projectName);
 	startupScene = std::move(scene);
 	projectOpen = true;
+
+	bool compiledScripts = ScriptCompiler::compile();
+	if (compiledScripts) {
+		ScriptLoader::replaceOldDLLFile();
+		ScriptCompiler::loadDLL();
+	}
 
 	return true;
 }

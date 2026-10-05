@@ -38,6 +38,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
+/*
 // command line argument (a directory is made into a project if it isn't one yet), else the last opened project,
 // else the sample project in the repo
 static bool openProject(int argc, char** argv) {
@@ -64,13 +65,9 @@ static bool openProject(int argc, char** argv) {
 	editorConfig.saveToFile(editorConfigName);
 
 	return true;
-}
+}*/
 
-int main(int argc, char** argv) {
-	if (!openProject(argc, argv)) {
-		std::cout << "Failed to open a project\n";
-	}
-
+int main() {
 	if (!glfwInit()) {
 		std::cout << "Failed to initialize GLFW\n";
 		return -1;
@@ -102,7 +99,7 @@ int main(int argc, char** argv) {
 	}
 
 	glfwMakeContextCurrent(window);
-	glfwSwapInterval(0);
+	glfwSwapInterval(1);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -113,18 +110,6 @@ int main(int argc, char** argv) {
 	}
 
 	glViewport(0, 0, 1000, 800);
-
-
-	// TODO: Write an actual polling system for script modification, until then leave poll() commented out
-
-	// compile() emits temp_scripts.dll; replaceOldDLLFile() renames it to scripts.dll
-	// (the reload path does this too, but the initial compile needs it explicitly).
-	// Both live in <project>/.vesta/build
-	if (!ScriptLoader::scriptsDLLExists()) {
-		if (ScriptCompiler::compile())
-			ScriptLoader::replaceOldDLLFile();
-	}
-	ScriptCompiler::loadDLL();
 
 	Input::init(window);
 

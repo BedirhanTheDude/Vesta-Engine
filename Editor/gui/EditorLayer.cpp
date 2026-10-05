@@ -7,6 +7,7 @@
 #include <core/Input.h>
 
 #include <controller/SceneController.h>
+#include <controller/ScriptingController.h>
 #include <controller/EntityController.h>
 #include <controller/AssetController.h>
 #include <controller/ComponentController.h>
@@ -129,6 +130,14 @@ void EditorLayer::ShowMenuBar() {
             ImGui::MenuItem("Console", nullptr, &showConsole);
             ImGui::MenuItem("Scene", nullptr, &showScene);
             ImGui::MenuItem("Game", nullptr, &showGame);
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Assets")) {
+            if (ImGui::MenuItem("Compile Scripts")) {
+                ScriptingController::compileScripts();
+            }
+
             ImGui::EndMenu();
         }
 
