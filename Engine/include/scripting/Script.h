@@ -8,7 +8,7 @@
 
 class Archive;
 
-#define SCRIPT(ScriptName) \
+#define BEGIN_SCRIPT(ScriptName) \
     class ScriptName : public BehaviourComponent {
 
 // for registering ONLY user level scripts/components
@@ -27,4 +27,4 @@ class Archive;
             c.deserialize(arch); \
         }, COMPONENT_OPS(ScriptName)); \
         return true; \
-    }()
+    }();

@@ -7,14 +7,44 @@
 
 #include <iostream>
 #include <system_error>
+#include <filesystem>
+#include <string>
+#include <mutex>
 
 namespace fs = std::filesystem;
 
 fs::path Project::root;
 fs::path Project::cacheDirectory;
+fs::path Project::projectArchivePath;
 std::string Project::name;
 std::string Project::startupScene;
+std::mutex Project::sceneMutex;
 bool Project::projectOpen = false;
+
+static bool tryGetProjectArchivePath(const std::filesystem::path rootPath, std::filesystem::path& outPath) {
+	auto options = std::filesystem::directory_options::skip_permission_denied;
+	std::error_code ec;
+
+	auto it = std::filesystem::recursive_directory_iterator(rootPath, options, ec);
+	auto end = std::filesystem::recursive_directory_iterator();
+
+	if (ec) return false;
+
+	while (it != end) {
+		if (it->is_regular_file(ec) && it->path().extension() == Project::projectFileExtension) {
+			outPath = it->path();
+			return true;
+		}
+
+		it.increment(ec);
+		if (ec) {
+			ec.clear();
+			continue;
+		}
+	}
+
+	return false;
+}
 
 bool Project::isOpen() { return projectOpen; }
 const fs::path& Project::getRoot() { return root; }
@@ -30,13 +60,21 @@ bool Project::create(const fs::path& rootPath, const std::string& projectName) {
 		return false;
 	}
 
-	if (!fs::exists(rootPath / projectFileName, ec)) {
+	fs::path cache = rootPath / cacheDirectoryName;
+	fs::create_directories(cache, ec);
+	if (ec) {
+		std::cerr << "[Error] Could not create " << cache << ": " << ec.message() << '\n';
+		return false;
+	}
+
+	projectArchivePath = cache / (projectName + projectFileExtension);
+	if (!fs::exists(projectArchivePath, ec)) {
 		Archive arch;
 		arch.set("name", projectName);
 		arch.set("startupScene", std::string());
 
-		if (!arch.saveToFile(rootPath / projectFileName)) {
-			std::cerr << "[Error] Could not write " << projectFileName << " in " << rootPath << '\n';
+		if (!arch.saveToFile(projectArchivePath)) {
+			std::cerr << "[Error] Could not write " << projectArchivePath.filename() << " in " << rootPath << '\n';
 			return false;
 		}
 	}
@@ -54,9 +92,13 @@ bool Project::open(const fs::path& rootPath) {
 		return false;
 	}
 
+	bool archiveFound = tryGetProjectArchivePath(absolute, projectArchivePath);
+
+	if (!archiveFound) return false;
+
 	Archive arch;
-	if (!arch.loadFromFile(absolute / projectFileName)) {
-		std::cerr << "[Error] No readable " << projectFileName << " in " << absolute << '\n';
+	if (!arch.loadFromFile(projectArchivePath)) {
+		std::cerr << "[Error] No readable " << projectFileExtension << " in " << absolute << '\n';
 		return false;
 	}
 
@@ -65,15 +107,8 @@ bool Project::open(const fs::path& rootPath) {
 	arch.get("name", projectName);
 	arch.get("startupScene", scene);
 
-	fs::path cache = absolute / cacheDirectoryName;
-	fs::create_directories(cache, ec);
-	if (ec) {
-		std::cerr << "[Error] Could not create " << cache << ": " << ec.message() << '\n';
-		return false;
-	}
-
 	root = std::move(absolute);
-	cacheDirectory = std::move(cache);
+	cacheDirectory = root / cacheDirectoryName;
 	name = std::move(projectName);
 	startupScene = std::move(scene);
 	projectOpen = true;
@@ -122,6 +157,10 @@ bool Project::isIgnoredDirectory(const fs::path& directory) {
 	return !str.empty() && str[0] == '.';
 }
 
+bool Project::isProjectFile(const fs::path& path) {
+	return path == projectArchivePath;
+}
+
 void Project::setStartupScene(const std::string& relativeScenePath) {
 	if (!projectOpen || startupScene == relativeScenePath) return;
 
@@ -129,13 +168,17 @@ void Project::setStartupScene(const std::string& relativeScenePath) {
 	save();
 }
 
+std::mutex& Project::getSceneMutex() {
+	return sceneMutex;
+}
+
 bool Project::save() {
 	Archive arch;
 	arch.set("name", name);
 	arch.set("startupScene", startupScene);
 
-	if (!arch.saveToFile(root / projectFileName)) {
-		std::cerr << "[Error] Could not write " << (root / projectFileName) << '\n';
+	if (!arch.saveToFile(projectArchivePath)) {
+		std::cerr << "[Error] Could not write " << projectArchivePath << '\n';
 		return false;
 	}
 

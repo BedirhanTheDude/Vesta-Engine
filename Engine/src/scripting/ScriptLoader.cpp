@@ -22,15 +22,53 @@ static bool isScriptHeader(const fs::path& path) {
 
 	std::string buf;
 	while (std::getline(file, buf)) {
-		if (buf.find("END_SCRIPT") != std::string::npos) // check END_SCRIPT first because SCRIPT is a subset
-			scriptEnd = true;
-		else if (buf.find("SCRIPT") != std::string::npos)
+	    if (buf.find("BEGIN_SCRIPT") != std::string::npos)
 			scriptBegin = true;
-
+		else if (buf.find("END_SCRIPT") != std::string::npos)
+			scriptEnd = true;
+		
 		if (scriptBegin && scriptEnd) return true;
 	}
 
 	return false;
+}
+
+bool ScriptLoader::createNewScriptFile(const std::string& scriptName, const std::string& absPath) {
+	std::filesystem::path scriptPath(absPath);
+	scriptPath = scriptPath / (scriptName + ".h");
+
+	if (std::filesystem::exists(scriptPath)) {
+		std::cerr << "[Error] Script named " << scriptName << " already exists at " << absPath << std::endl;
+		return false;
+	}
+	
+	std::ofstream scriptFile(scriptPath);
+
+	if (!scriptFile.is_open()) {
+		std::cerr << "[Error] Could not create file at " << absPath << std::endl;
+		return false;
+	}
+
+	scriptFile << R"(#pragma once
+
+#include <scripting/Script.h>
+
+BEGIN_SCRIPT()" << scriptName << R"()
+public:
+	// Runs once when the script is first attached or at scene start
+	void onStart() override {
+
+	}
+
+	// Runs once every frame
+	void onUpdate(float dt) override {
+
+	}
+END_SCRIPT()" << scriptName << R"()
+)";
+
+	scriptFile.close();
+	return true;
 }
 
 bool ScriptLoader::isScriptSourceFile(const fs::path& path) {

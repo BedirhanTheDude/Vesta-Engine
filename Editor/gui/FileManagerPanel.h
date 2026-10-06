@@ -55,6 +55,9 @@ private:
     std::filesystem::path renamingPath;
     char renameBuffer[256] = {};
 
+    bool deletePopupTriggered = false;
+    FileNode* nodeToBeDeleted = nullptr;
+
     bool createFolderOpen = false;
     char newFolderName[128] = "New Folder";
 
@@ -76,7 +79,6 @@ private:
 
     void refreshScripts();
     void drawScriptsTab();
-    void importScript(const std::string& srcAbsolutePath);
 
     bool importScriptPopupOpen = false;
     static char importScriptPathBuf[512];

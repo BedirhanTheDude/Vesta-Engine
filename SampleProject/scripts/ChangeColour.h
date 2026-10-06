@@ -7,7 +7,7 @@
 #include <scene/components/MaterialComponent.h>
 #include <renderer/Material.h>
 
-SCRIPT(ChangeColour)
+BEGIN_SCRIPT(ChangeColour)
 public:
 	SERIALIZE(float, speed, 1.0f);
 
@@ -39,4 +39,4 @@ public:
 		}
 	}
 
-END_SCRIPT(ChangeColour);
+	END_SCRIPT(ChangeColour)

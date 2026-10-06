@@ -16,6 +16,8 @@ public:
 	// false if the scripts can't be built (no project, two scripts with the same name)
 	static bool buildCompileCommandString(std::wstring& outCommand);
 
+	static bool createNewScriptFile(const std::string& scriptName, const std::string& path);
+
 	static void clearScriptCache() { sourcePaths.clear(); headerPaths.clear(); }
 	static bool buildDLLSourceFile();
 	static bool replaceOldDLLFile();

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+
 namespace ScriptingController {
-	bool compileScripts();
+	void compileScripts(bool* outCompiled = nullptr);
+	bool createNewScript(const std::string& scriptName, const std::string& path);
 }

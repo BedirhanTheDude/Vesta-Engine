@@ -13,6 +13,7 @@ namespace FileTypeController {
 
     // the project cache (.vesta) and other dot-directories, never shown or scanned
     bool isHiddenDirectory(const std::filesystem::path& p);
+    bool isProjectFile(const std::filesystem::path& p);
 
     // "[DIR]" / "[IMG]" / "[OBJ]" / "[SCN]" / "[SHD]" / "[SCR]" / "[AUD]" / "[FILE]"
     const char* iconForExtension(const std::filesystem::path& p, bool isDirectory);

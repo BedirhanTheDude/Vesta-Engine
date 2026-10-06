@@ -27,6 +27,10 @@ bool FileTypeController::isHiddenDirectory(const std::filesystem::path& p) {
     return Project::isIgnoredDirectory(p);
 }
 
+bool FileTypeController::isProjectFile(const std::filesystem::path& p) {
+    return Project::isProjectFile(p);
+}
+
 bool FileTypeController::isShaderFile(const std::filesystem::path& p) {
     auto e = p.extension().string();
     return e == ".glsl" || e == ".vert" || e == ".frag" || e == ".hlsl";

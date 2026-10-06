@@ -1,5 +1,6 @@
 #include <gui/FileManagerPanel.h>
 
+#include <controller/ScriptingController.h>
 #include <controller/SceneController.h>
 #include <controller/AssetController.h>
 #include <controller/FileTypeController.h>
@@ -22,6 +23,13 @@ void FileManagerPanel::init(const std::filesystem::path& rootPath) {
 }
 
 void FileManagerPanel::refresh() {
+    renamingActive = false;
+    deletePopupTriggered = false;
+    createFolderOpen = false;
+    importPopupOpen = false;
+    importScriptPopupOpen = false;
+    nodeToBeDeleted = nullptr;
+
     // the current directory may have been deleted or renamed from outside
     std::error_code ec;
     if (!std::filesystem::is_directory(currentDir, ec))
@@ -37,6 +45,7 @@ void FileManagerPanel::refresh() {
         n.isDirectory = entry.is_directory(entryEc);
 
         if (n.isDirectory && FileTypeController::isHiddenDirectory(n.path)) continue;
+        if (!n.isDirectory && FileTypeController::isProjectFile(n.path)) continue;
 
         currentItems.push_back(n);
     }
@@ -188,27 +197,15 @@ void FileManagerPanel::refreshScripts() {
     std::sort(scriptNames.begin(), scriptNames.end());
 }
 
-void FileManagerPanel::importScript(const std::string& srcAbsolutePath) {
-    std::filesystem::path src = std::filesystem::u8path(srcAbsolutePath);
-    std::error_code existsEc;
-    if (!std::filesystem::exists(src, existsEc)) return;
-    std::filesystem::path dest = currentDir / src.filename();
-    std::error_code ec;
-    std::filesystem::copy_file(src, dest, std::filesystem::copy_options::overwrite_existing, ec);
-    if (ec) std::cerr << "Script import failed: " << ec.message() << "\n";
-    refresh();
-    refreshScripts();
-}
-
 void FileManagerPanel::drawScriptsTab() {
-    if (ImGui::Button("Add Script")) importScriptPopupOpen = true;
+    if (ImGui::Button("Create Script")) importScriptPopupOpen = true;
     ImGui::SameLine();
     if (ImGui::Button("Refresh##scripts")) refreshScripts();
     ImGui::Separator();
 
     if (scriptItems.empty()) {
         ImGui::TextDisabled("No scripts found in the project.");
-        ImGui::TextDisabled("Click 'Add Script' to import a .h/.cpp file into the current folder.");
+        ImGui::TextDisabled("Click 'Create Script' to create a new script.");
     }
 
     float panelWidth = ImGui::GetContentRegionAvail().x;
@@ -286,29 +283,30 @@ void FileManagerPanel::show(bool* open) {
 
     ImGui::Separator();
 
+    if (importScriptPopupOpen) {
+        ImGui::OpenPopup("Import Script##FM");
+        importScriptPopupOpen = false;
+    }
+    if (ImGui::BeginPopupModal("Import Script##FM", nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Name the script you want to create:");
+        ImGui::InputText("##importscript", importScriptPathBuf, sizeof(importScriptPathBuf));
+        if (ImGui::Button("Create", ImVec2(120, 0))) {
+            ScriptingController::createNewScript(importScriptPathBuf, currentDir.string());
+            refresh();
+            memset(importScriptPathBuf, 0, sizeof(importScriptPathBuf));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
     if (activeTab == Tab::Scripts) {
         ImGui::BeginChild("##FMScripts", ImVec2(0, 0), false,
             ImGuiWindowFlags_HorizontalScrollbar);
         drawScriptsTab();
         ImGui::EndChild();
-
-        if (importScriptPopupOpen) {
-            ImGui::OpenPopup("Import Script##FM");
-            importScriptPopupOpen = false;
-        }
-        if (ImGui::BeginPopupModal("Import Script##FM", nullptr,
-            ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("Paste absolute path to script file (.h/.cpp/.lua):");
-            ImGui::InputText("##importscript", importScriptPathBuf, sizeof(importScriptPathBuf));
-            if (ImGui::Button("Import", ImVec2(120, 0))) {
-                importScript(std::string(importScriptPathBuf));
-                memset(importScriptPathBuf, 0, sizeof(importScriptPathBuf));
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
-        }
 
         ImGui::End();
         return;
@@ -473,6 +471,30 @@ void FileManagerPanel::drawItem(FileNode& node) {
 
     ImGui::PushID(node.path.u8string().c_str());
 
+    if (deletePopupTriggered) {
+        if (nodeToBeDeleted && nodeToBeDeleted == &node) {
+            ImGui::OpenPopup(("Delete?##" + nodeToBeDeleted->path.string()).c_str());
+            deletePopupTriggered = false;
+        }
+    }
+
+    if (nodeToBeDeleted && ImGui::BeginPopupModal(("Delete?##" + nodeToBeDeleted->path.string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Delete \"%s\"?\nThis cannot be undone.", nodeToBeDeleted->name.c_str());
+        ImGui::Separator();
+
+        if (ImGui::Button("Delete", ImVec2(120, 0))) {
+            deleteItem(*nodeToBeDeleted);
+            nodeToBeDeleted = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            nodeToBeDeleted = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     if (renamingActive && renamingPath == node.path) {
         ImGui::SetNextItemWidth(itemSize);
         if (ImGui::InputText("##rename", renameBuffer, sizeof(renameBuffer),
@@ -559,6 +581,7 @@ void FileManagerPanel::drawContextMenuBackground() {
             strcpy(newFolderName, "New Folder");
             createFolderOpen = true;
         }
+        if (ImGui::MenuItem("Create Script")) importScriptPopupOpen = true;
         if (ImGui::MenuItem("Import Asset...")) importPopupOpen = true;
         if (ImGui::MenuItem("Refresh"))         refresh();
         ImGui::EndPopup();
@@ -613,23 +636,8 @@ void FileManagerPanel::drawContextMenuItem(FileNode& node) {
         ImGui::Separator();
 
         if (ImGui::MenuItem("Delete")) {
-            ImGui::OpenPopup(("Delete?##" + node.path.string()).c_str());
-        }
-        if (ImGui::BeginPopupModal(("Delete?##" + node.path.string()).c_str(),
-            nullptr,
-            ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("Delete \"%s\"?\nThis cannot be undone.", node.name.c_str());
-            ImGui::Separator();
-            if (ImGui::Button("Delete", ImVec2(120, 0))) {
-                deleteItem(node);
-                ImGui::CloseCurrentPopup();
-                ImGui::EndPopup();
-                ImGui::EndPopup();
-                return;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
+            deletePopupTriggered = true;
+            nodeToBeDeleted = &node;
         }
 
         ImGui::EndPopup();

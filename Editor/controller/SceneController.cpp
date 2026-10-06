@@ -57,22 +57,29 @@ void SceneController::saveScene(bool temp) {
 
 void SceneController::createEntity(const std::string& name) {
 	Scene* scene = getCurrentScene();
+	if (!scene) return;
+
 	if (scene->isPlaying) scene->createEntity(name);
 	else scene->createEntityImmediate(name);
 }
 
 void SceneController::removeEntity(const std::string& name) {
 	Scene* scene = getCurrentScene();
+	if (!scene) return;
+
 	scene->removeEntity(name);
 }
 
 void SceneController::removeEntity(unsigned int ID) {
 	Scene* scene = getCurrentScene();
+	if (!scene) return;
+
 	scene->removeEntity(ID);
 }
 
 void SceneController::playScene() {
 	Scene* scene = getCurrentScene();
+	if (!scene) return;
 
 	saveScene(true);
 	scene->isPlaying = true;
@@ -80,6 +87,7 @@ void SceneController::playScene() {
 
 void SceneController::stopScene(bool interrupt) {
 	Scene* scene = getCurrentScene();
+	if (!scene) return;
 
 	scene->isPlaying = false;
 	loadScene(!interrupt); // if not interrupted load temp as usual
@@ -91,7 +99,11 @@ bool SceneController::sceneExists() {
 }
 
 bool SceneController::sceneIsPlaying() {
-	return getCurrentScene()->isPlaying;
+	Scene* scene = getCurrentScene();
+	if (!scene)
+		return false;
+	else
+		return scene->isPlaying;
 }
 
 Scene* SceneController::getCurrentScene() {

@@ -1,6 +1,7 @@
 #include <scene/Scene.h>
 
 #include <core/Input.h>
+#include <core/Project.h>
 #include <scene/Entity.h>
 #include <scene/components/CameraComponent.h>
 #include <scene/components/DirectionalLightComponent.h>
@@ -31,6 +32,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <stdexcept>
+#include <mutex>
 
 void Scene::createDefaultScene(Scene& scene) {
 	scene.clear();
@@ -324,6 +326,11 @@ void Scene::onCameraAdded(const Entity& camera)
 }
 
 void Scene::onUpdate(float dt) {
+	// The Project has a longer lifetime than Scene so no need to get this every frame
+	static std::mutex& sceneMutex = Project::getSceneMutex();
+
+	std::lock_guard<std::mutex> lock(sceneMutex); // unlocks the moment this goes out of scope
+
 	removeDeadEntities();
 	addNewEntities();
 
