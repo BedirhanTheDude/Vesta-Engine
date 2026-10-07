@@ -2,9 +2,9 @@
 
 class Archive;
 
-class Serializable {
+class ISerializable {
 public:
-	~Serializable() = default;
+	~ISerializable() = default;
 	virtual void serialize(Archive& arch) const = 0;
 	virtual void deserialize(const Archive& arch) = 0;
 };

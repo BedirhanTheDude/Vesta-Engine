@@ -10,6 +10,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <controller/ProjectController.h>
+#include <controller/WindowController.h>
+
 void ImGuiLayer::Init(GLFWwindow* window) {
     m_Window = window;
 
@@ -36,6 +39,19 @@ void ImGuiLayer::Init(GLFWwindow* window) {
 #else
     ImGui_ImplOpenGL3_Init("#version 330");
 #endif
+
+    if (ProjectController::isProjectOpen()) {
+        std::string projName;
+        if (ProjectController::tryGetProjectName(projName)) {
+            WindowController::addWindowSuffix(projName);
+        }
+        else {
+            WindowController::addWindowSuffix("<blank>");
+        }
+    }
+    else {
+        WindowController::addWindowSuffix("[no-project]");
+    }
 }
 
 void ImGuiLayer::Begin() {

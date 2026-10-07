@@ -5,8 +5,6 @@
 #include <property/PropertySerializer.h>
 #include <persistance/Archive.h>
 
-REGISTER(BehaviourComponent);
-
 void BehaviourComponent::serialize(Archive& arch) const {
     PropertySerializer::serialize(*(PropertyHolder*)this, arch);
 }

@@ -10,22 +10,54 @@
 #include <persistance/SceneSerializer.h> // !!!
 #include <scene/Scene.h> // remove this tight coupling as soon as possible
 
+#include <core/Project.h>
+
+#include <iostream>
+#include <system_error>
+
 HMODULE ScriptCompiler::currentDLLHandle;
 bool ScriptCompiler::pollingEnabled = true;
 
+// the bundled compiler, include/ and Engine.lib are next to the executable
+static std::wstring getExecutableDirectory() {
+	std::wstring buffer(MAX_PATH, L'\0');
+
+	for (;;) {
+		DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+		if (length == 0) return {};
+
+		if (length < buffer.size()) {
+			buffer.resize(length);
+			break;
+		}
+
+		buffer.resize(buffer.size() * 2); // truncated
+	}
+
+	return std::filesystem::path(buffer).parent_path().wstring();
+}
+
 bool ScriptCompiler::compile() {
 	ScriptLoader::clearScriptCache();
-	ScriptLoader::buildDLLSourceFile();
+	if (!ScriptLoader::buildDLLSourceFile()) return false;
 
-	STARTUPINFOA si = {};
+	std::wstring cmd;
+	if (!ScriptLoader::buildCompileCommandString(cmd)) return false;
+
+	std::wstring workingDir = getExecutableDirectory();
+	if (workingDir.empty()) return false;
+
+	STARTUPINFOW si = {};
 	PROCESS_INFORMATION pi = {};
 
 	si.cb = sizeof(si);
-	std::string cmd = ScriptLoader::buildCompileCommandString();
 
-	std::string workingDir = ScriptLoader::getWorkingDirectoryString();
-	if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr,
-		FALSE, 0, nullptr, workingDir.c_str(), &si, &pi)) return false;
+	// CreateProcessW may write into the command line buffer, cmd.data() is writable in C++17
+	if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr,
+		FALSE, 0, nullptr, workingDir.c_str(), &si, &pi)) {
+		std::cerr << "[Error] Could not start the script compiler (error " << GetLastError() << ")\n";
+		return false;
+	}
 
 	WaitForSingleObject(pi.hProcess, INFINITE);
 	DWORD exitCode = 0;
@@ -35,10 +67,10 @@ bool ScriptCompiler::compile() {
 	return exitCode == 0;
 }
 
-// assumes the dll is always next to the binary
 HMODULE ScriptCompiler::loadDLL() {
-	std::filesystem::path dllPath = std::filesystem::current_path() / "scripts.dll";
-	currentDLLHandle = LoadLibraryA(dllPath.string().c_str());
+	if (!ScriptLoader::scriptsDLLExists()) return currentDLLHandle = nullptr;
+
+	currentDLLHandle = LoadLibraryW(ScriptLoader::getDLLPath().wstring().c_str());
 
 	if (currentDLLHandle) {
 		using RegisterFn = void(*)();
@@ -65,7 +97,7 @@ HMODULE ScriptCompiler::reloadScripts(Scene& scene) {
 	ComponentFactory::clearScriptRegistry();
 
 	ScriptCompiler::unloadDLL(ScriptCompiler::getCurrentDLLHandle());
-	ScriptLoader::replaceOldDLLFile();
+	ScriptLoader::replaceOldDLLFile(); // on failure the old DLL is still there and gets loaded again
 
 	ScriptCompiler::loadDLL(); // static lambdas reinitialize the script registry
 
@@ -77,26 +109,52 @@ HMODULE ScriptCompiler::reloadScripts(Scene& scene) {
 void ScriptCompiler::poll(float dt, Scene& scene) {
 	if (!pollingEnabled) return;
 
+	if (!Project::isOpen()) return;
+
 	static float timer = 0.0f;
+	static bool hasBaseline = false;
 	static std::filesystem::file_time_type lastWriteTime = {};
 
 	timer += dt;
 	if (timer < 1.0f) return;
 	timer = 0.0f;
 
-	auto scriptsPath = std::filesystem::current_path() / "scripts";
-	if (!std::filesystem::exists(scriptsPath)) return;
-
+	// TODO: replace this whole-project scan with a directory watcher
 	std::filesystem::file_time_type latestWrite = {};
-	for (const auto& entry : std::filesystem::recursive_directory_iterator(scriptsPath)) {
-		if (!entry.is_regular_file()) continue;
-		auto t = entry.last_write_time();
-		if (t > latestWrite) latestWrite = t;
+
+	std::error_code ec;
+	std::filesystem::recursive_directory_iterator it(Project::getRoot(),
+		std::filesystem::directory_options::skip_permission_denied, ec);
+	const std::filesystem::recursive_directory_iterator end;
+
+	// generated files live in the ignored cache directory, so the build can't trigger itself
+	for (; !ec && it != end; it.increment(ec)) {
+		const std::filesystem::directory_entry& entry = *it;
+		std::error_code entryEc;
+
+		if (entry.is_directory(entryEc)) {
+			if (Project::isIgnoredDirectory(entry.path()))
+				it.disable_recursion_pending();
+			continue;
+		}
+
+		if (!ScriptLoader::isScriptSourceFile(entry.path())) continue;
+
+		auto t = entry.last_write_time(entryEc);
+		if (!entryEc && t > latestWrite) latestWrite = t;
+	}
+
+	if (ec) return;
+
+	// the first scan only records what's there
+	if (!hasBaseline) {
+		hasBaseline = true;
+		lastWriteTime = latestWrite;
+		return;
 	}
 
 	if (latestWrite > lastWriteTime) {
 		lastWriteTime = latestWrite;
-		if (lastWriteTime != std::filesystem::file_time_type{})
-			reloadScripts(scene);
+		reloadScripts(scene);
 	}
 }

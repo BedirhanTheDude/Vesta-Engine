@@ -5,16 +5,16 @@
 #include <utility/EnumToString.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <memory>
 #include <vector>
 
-class PhysicsBody;
 class PhysicsMaterial;
 class CollisionShape;
 class Archive;
 
 enum RigidBodyType : int
-{ 
+{
 	Static,
 	Dynamic,
 	Kinematic
@@ -42,29 +42,28 @@ struct RigidBodyType_t {
 
 class RigidBodyComponent : public Component {
 public:
-	RigidBodyComponent(RigidBodyType type = Dynamic,
+	explicit RigidBodyComponent(const Entity& entity) : Component(entity) {}
+
+	// what addComponent<RigidBodyComponent>(type, material, shape, forceConvex) forwards to
+	void init(RigidBodyType type = Dynamic,
 		std::shared_ptr<PhysicsMaterial> material = nullptr,
 		std::shared_ptr<CollisionShape> shape = nullptr,
 		bool forceConvex = false);
 
-	~RigidBodyComponent();
-
-	bool onAttach() override;
-	void onDetach() override;
+	// onAttach creates the physics actor, false if the entity has a parent (bodies simulate in world space)
+	bool onAttach();
+	void onDetach();
 
 	void serialize(Archive& arch) const override;
 	void deserialize(const Archive& arch) override;
 
-	void pushToWorld();
-	void pullFromWorld();
-
-	RigidBodyType getType() const { return type; }
+	RigidBodyType getType() const;
 	void setType(RigidBodyType newType);
 
-	bool getForceConvex() const { return forceConvex; }
+	bool getForceConvex() const;
 	void setForceConvex(bool value);
 
-	bool getUseTriangleMesh() const { return useTriangleMesh; }
+	bool getUseTriangleMesh() const;
 	void setUseTriangleMesh(bool value);
 
 	void setGlobalPose(const glm::vec3& pos, const glm::quat& rot, bool autowake = true);
@@ -83,8 +82,8 @@ public:
 
 	void setLinearDamping(float damping);
 	void setAngularDamping(float damping);
-	float getLinearDamping() const { return linearDamping; }
-	float getAngularDamping() const { return angularDamping; }
+	float getLinearDamping() const;
+	float getAngularDamping() const;
 
 	glm::vec3 getWorldPosition() const;
 	glm::quat getWorldRotation() const;
@@ -97,22 +96,4 @@ public:
 	float getRestitution() const;
 
 	std::shared_ptr<PhysicsMaterial> getMaterial() const;
-
-private:
-	glm::vec3 lastScale = glm::vec3(1.0f);
-
-	void registerProperties();
-
-	void recookShape();
-	void rebuild();
-
-	bool forceConvex = false;
-	bool useTriangleMesh = false;
-	float linearDamping = 0.2f;
-	float angularDamping = 0.1f;
-
-	RigidBodyType type;
-	std::unique_ptr<PhysicsBody> body;
-	std::shared_ptr<PhysicsMaterial> material;
-	std::shared_ptr<CollisionShape> shape;
 };

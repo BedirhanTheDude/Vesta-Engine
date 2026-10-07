@@ -1,6 +1,11 @@
 #include <core/AssetManager.h>
 
 #include <string>
+#include <filesystem>
+#include <iostream>
+#include <system_error>
+
+#include <core/Project.h>
 
 #include <renderer/ObjLoader.h>
 #include <renderer/PrimitiveFactory.h>
@@ -25,8 +30,8 @@ bool AssetManager::loadMesh(const std::string& name) {
         mesh = PrimitiveFactory::createCube();
     else if (name == "sphere")
         mesh = PrimitiveFactory::createSphere();
-    else if (name == "plane")
-        mesh = PrimitiveFactory::createPlane();
+    else if (name == "quad")
+        mesh = PrimitiveFactory::createQuad();
     else
         mesh = ObjLoader::load(name);
 
@@ -38,32 +43,67 @@ bool AssetManager::loadMesh(const std::string& name) {
     else return false;
 }
 
+static bool resolveShaderBasePath(const std::string& name, std::filesystem::path& outBasePath) {
+    std::filesystem::path projectBase;
+    bool inProject = Project::resolve(name, projectBase);
+
+    // skip the built-in shader check if path contains "/" (a subfolder)
+    if (name.find('/') == std::string::npos) {
+        std::filesystem::path engineBase = ShaderProgram::getEngineShaderDirectory() / std::filesystem::u8path(name);
+        std::filesystem::path engineVert = engineBase;
+        engineVert += ".vert";
+
+        std::error_code ec;
+        if (std::filesystem::exists(engineVert, ec)) {
+            std::filesystem::path projectVert = projectBase;
+            projectVert += ".vert";
+
+            if (inProject && std::filesystem::exists(projectVert, ec))
+                std::cerr << "[Warning] Project shader \"" << name
+                    << "\" has the same name as a built-in shader, the built-in one is used\n";
+
+            outBasePath = std::move(engineBase);
+            return true;
+        }
+    }
+
+    if (!inProject) return false;
+
+    outBasePath = std::move(projectBase);
+    return true;
+}
+
 bool AssetManager::loadShader(const std::string& name) {
     auto it = shaders.find(name);
     if (it != shaders.end()) return true;
 
-    auto shader = std::make_shared<ShaderProgram>(name);
-    
-    if (shader) {
-        shader->setName(name);
-        shaders[name] = shader;
-        return true;
+    std::filesystem::path basePath;
+    if (!resolveShaderBasePath(name, basePath)) {
+        std::cerr << "[Error] Shader \"" << name << "\" is neither built-in nor a path inside the project\n";
+        return false;
     }
-    else return false;
+
+    auto shader = std::make_shared<ShaderProgram>(name, basePath);
+    shaders[name] = shader;
+    return true;
 }
 
 bool AssetManager::loadTexture(const std::string& name) {
     auto it = textures.find(name);
     if (it != textures.end()) return true;
 
-    auto tex = std::make_shared<Texture>(name);
-
-    if (tex) {
-        tex->setName(name);
-        textures[name] = tex;
-        return true;
+    std::filesystem::path filePath;
+    if (!Project::resolve(name, filePath)) {
+        std::cerr << "[Error] Texture \"" << name << "\" is not a path inside the project\n";
+        return false;
     }
-    else return false;
+
+    auto tex = std::make_shared<Texture>(filePath);
+    if (!tex->isLoaded()) return false;
+
+    tex->setName(name);
+    textures[name] = tex;
+    return true;
 }
 
 bool AssetManager::loadModel(const std::string& name) {
@@ -78,7 +118,7 @@ bool AssetManager::loadModel(const std::string& name) {
         meshes[name] = model.mesh;
         return true;
     }
-    else return true;
+    else return false;
 }
 
 std::shared_ptr<Mesh> AssetManager::getMesh(const std::string& name) {

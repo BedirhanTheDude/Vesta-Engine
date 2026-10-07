@@ -1,5 +1,6 @@
 #include <gui/FileManagerPanel.h>
 
+#include <controller/ScriptingController.h>
 #include <controller/SceneController.h>
 #include <controller/AssetController.h>
 #include <controller/FileTypeController.h>
@@ -13,25 +14,39 @@
 #include <iostream>
 #include <cstring>
 
-void FileManagerPanel::init(const std::string& rootPath) {
-    this->rootPath = std::filesystem::absolute(rootPath);
+void FileManagerPanel::init(const std::filesystem::path& rootPath) {
+    this->rootPath = rootPath;
     currentDir = this->rootPath;
 
-    if (!std::filesystem::exists(this->rootPath))
-        std::filesystem::create_directories(this->rootPath);
-
     refresh();
+    refreshScripts();
 }
 
 void FileManagerPanel::refresh() {
+    renamingActive = false;
+    deletePopupTriggered = false;
+    createFolderOpen = false;
+    importPopupOpen = false;
+    importScriptPopupOpen = false;
+    nodeToBeDeleted = nullptr;
+
+    // the current directory may have been deleted or renamed from outside
+    std::error_code ec;
+    if (!std::filesystem::is_directory(currentDir, ec))
+        currentDir = rootPath;
+
     rootNode = buildTree(rootPath);
     currentItems.clear();
-    std::error_code ec;
     for (auto& entry : std::filesystem::directory_iterator(currentDir, ec)) {
+        std::error_code entryEc;
         FileNode n;
         n.path = entry.path();
         n.name = entry.path().filename().string();
-        n.isDirectory = entry.is_directory();
+        n.isDirectory = entry.is_directory(entryEc);
+
+        if (n.isDirectory && FileTypeController::isHiddenDirectory(n.path)) continue;
+        if (!n.isDirectory && FileTypeController::isProjectFile(n.path)) continue;
+
         currentItems.push_back(n);
     }
     std::sort(currentItems.begin(), currentItems.end(),
@@ -45,12 +60,14 @@ FileNode FileManagerPanel::buildTree(const std::filesystem::path& path, int dept
     FileNode node;
     node.path = path;
     node.name = path.filename().string();
-    node.isDirectory = std::filesystem::is_directory(path);
+
+    std::error_code ec;
+    node.isDirectory = std::filesystem::is_directory(path, ec);
 
     if (node.isDirectory && depth < 8) {
-        std::error_code ec;
         for (auto& entry : std::filesystem::directory_iterator(path, ec)) {
-            if (entry.is_directory())
+            std::error_code entryEc;
+            if (entry.is_directory(entryEc) && !FileTypeController::isHiddenDirectory(entry.path()))
                 node.children.push_back(
                     std::make_shared<FileNode>(buildTree(entry.path(), depth + 1)));
         }
@@ -126,8 +143,9 @@ void FileManagerPanel::deleteItem(FileNode& node) {
 }
 
 void FileManagerPanel::importAsset(const std::string& srcAbsolutePath) {
-    std::filesystem::path src(srcAbsolutePath);
-    if (!std::filesystem::exists(src)) return;
+    std::filesystem::path src = std::filesystem::u8path(srcAbsolutePath);
+    std::error_code existsEc;
+    if (!std::filesystem::exists(src, existsEc)) return;
 
     std::filesystem::path dest = currentDir / src.filename();
     std::error_code ec;
@@ -139,57 +157,55 @@ void FileManagerPanel::importAsset(const std::string& srcAbsolutePath) {
 
 char FileManagerPanel::importScriptPathBuf[512] = {};
 
-void FileManagerPanel::initScriptsPath(const std::string& path) {
-    scriptsPath = std::filesystem::absolute(path);
-    if (!std::filesystem::exists(scriptsPath))
-        std::filesystem::create_directories(scriptsPath);
-    refreshScripts();
-}
-
+// scripts can be anywhere in the project, this walks the whole tree (skipping hidden directories)
 void FileManagerPanel::refreshScripts() {
     scriptItems.clear();
-    if (scriptsPath.empty() || !std::filesystem::exists(scriptsPath)) return;
+    scriptNames.clear();
+
     std::error_code ec;
-    for (auto& entry : std::filesystem::directory_iterator(scriptsPath, ec)) {
-        if (!entry.is_regular_file()) continue;
-        auto ext = entry.path().extension().string();
-        if (ext != ".h" && ext != ".cpp" && ext != ".lua" && ext != ".py" && ext != ".cs") continue;
+    std::filesystem::recursive_directory_iterator it(rootPath,
+        std::filesystem::directory_options::skip_permission_denied, ec);
+    const std::filesystem::recursive_directory_iterator end;
+
+    for (; !ec && it != end; it.increment(ec)) {
+        const std::filesystem::directory_entry& entry = *it;
+        std::error_code entryEc;
+
+        if (entry.is_directory(entryEc)) {
+            if (FileTypeController::isHiddenDirectory(entry.path()))
+                it.disable_recursion_pending();
+            continue;
+        }
+
+        if (!entry.is_regular_file(entryEc)) continue;
+
+        const std::filesystem::path extension = entry.path().extension();
+        if (extension != ".h" && extension != ".cpp") continue;
+
         FileNode n;
         n.path = entry.path();
         n.name = entry.path().filename().string();
         n.isDirectory = false;
         scriptItems.push_back(n);
+
+        if (extension == ".h")
+            scriptNames.push_back(entry.path().stem().string());
     }
+
     std::sort(scriptItems.begin(), scriptItems.end(),
         [](const FileNode& a, const FileNode& b) { return a.name < b.name; });
-}
-
-std::vector<std::string> FileManagerPanel::getScriptNames() const {
-    std::vector<std::string> names;
-    for (auto& item : scriptItems)
-        names.push_back(item.path.filename().string());   // == stem + extension, simpler
-    return names;
-}
-
-void FileManagerPanel::importScript(const std::string& srcAbsolutePath) {
-    std::filesystem::path src(srcAbsolutePath);
-    if (!std::filesystem::exists(src)) return;
-    std::filesystem::path dest = scriptsPath / src.filename();
-    std::error_code ec;
-    std::filesystem::copy_file(src, dest, std::filesystem::copy_options::overwrite_existing, ec);
-    if (ec) std::cerr << "Script import failed: " << ec.message() << "\n";
-    refreshScripts();
+    std::sort(scriptNames.begin(), scriptNames.end());
 }
 
 void FileManagerPanel::drawScriptsTab() {
-    if (ImGui::Button("Add Script")) importScriptPopupOpen = true;
+    if (ImGui::Button("Create Script")) importScriptPopupOpen = true;
     ImGui::SameLine();
     if (ImGui::Button("Refresh##scripts")) refreshScripts();
     ImGui::Separator();
 
     if (scriptItems.empty()) {
-        ImGui::TextDisabled("No scripts found in scripts folder.");
-        ImGui::TextDisabled("Click 'Add Script' to import a .h/.cpp file.");
+        ImGui::TextDisabled("No scripts found in the project.");
+        ImGui::TextDisabled("Click 'Create Script' to create a new script.");
     }
 
     float panelWidth = ImGui::GetContentRegionAvail().x;
@@ -197,7 +213,7 @@ void FileManagerPanel::drawScriptsTab() {
     ImGui::Columns(columns, "##scriptgrid", false);
 
     for (auto& node : scriptItems) {
-        ImGui::PushID(node.path.string().c_str());
+        ImGui::PushID(node.path.u8string().c_str());
 
         bool selected = (selectedPath == node.path);
         if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.59f, 0.98f, 0.35f));
@@ -219,7 +235,7 @@ void FileManagerPanel::drawScriptsTab() {
             ImGui::TextDisabled("%s", node.name.c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("Show in Explorer")) {
-                FileTypeController::revealInExplorer(scriptsPath);
+                FileTypeController::revealInExplorer(node.path.parent_path());
             }
             if (ImGui::MenuItem("Delete")) {
                 std::error_code ec;
@@ -247,14 +263,6 @@ void FileManagerPanel::drawScriptsTab() {
 }
 
 void FileManagerPanel::show(bool* open) {
-    ImGuiIO& io = ImGui::GetIO();
-    refreshTimer += io.DeltaTime;
-    if (refreshTimer >= refreshInterval) {
-        refreshTimer = 0.0f;
-        refresh();
-        refreshScripts();
-    }
-
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
     if (!ImGui::Begin("File Manager", open, flags)) {
         ImGui::End();
@@ -275,29 +283,30 @@ void FileManagerPanel::show(bool* open) {
 
     ImGui::Separator();
 
+    if (importScriptPopupOpen) {
+        ImGui::OpenPopup("Import Script##FM");
+        importScriptPopupOpen = false;
+    }
+    if (ImGui::BeginPopupModal("Import Script##FM", nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Name the script you want to create:");
+        ImGui::InputText("##importscript", importScriptPathBuf, sizeof(importScriptPathBuf));
+        if (ImGui::Button("Create", ImVec2(120, 0))) {
+            ScriptingController::createNewScript(importScriptPathBuf, currentDir.string());
+            refresh();
+            memset(importScriptPathBuf, 0, sizeof(importScriptPathBuf));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
     if (activeTab == Tab::Scripts) {
         ImGui::BeginChild("##FMScripts", ImVec2(0, 0), false,
             ImGuiWindowFlags_HorizontalScrollbar);
         drawScriptsTab();
         ImGui::EndChild();
-
-        if (importScriptPopupOpen) {
-            ImGui::OpenPopup("Import Script##FM");
-            importScriptPopupOpen = false;
-        }
-        if (ImGui::BeginPopupModal("Import Script##FM", nullptr,
-            ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("Paste absolute path to script file (.h/.cpp/.lua):");
-            ImGui::InputText("##importscript", importScriptPathBuf, sizeof(importScriptPathBuf));
-            if (ImGui::Button("Import", ImVec2(120, 0))) {
-                importScript(std::string(importScriptPathBuf));
-                memset(importScriptPathBuf, 0, sizeof(importScriptPathBuf));
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
-        }
 
         ImGui::End();
         return;
@@ -460,7 +469,31 @@ void FileManagerPanel::drawContentBrowser() {
 void FileManagerPanel::drawItem(FileNode& node) {
     bool selected = (selectedPath == node.path);
 
-    ImGui::PushID(node.path.string().c_str());
+    ImGui::PushID(node.path.u8string().c_str());
+
+    if (deletePopupTriggered) {
+        if (nodeToBeDeleted && nodeToBeDeleted == &node) {
+            ImGui::OpenPopup(("Delete?##" + nodeToBeDeleted->path.string()).c_str());
+            deletePopupTriggered = false;
+        }
+    }
+
+    if (nodeToBeDeleted && ImGui::BeginPopupModal(("Delete?##" + nodeToBeDeleted->path.string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Delete \"%s\"?\nThis cannot be undone.", nodeToBeDeleted->name.c_str());
+        ImGui::Separator();
+
+        if (ImGui::Button("Delete", ImVec2(120, 0))) {
+            deleteItem(*nodeToBeDeleted);
+            nodeToBeDeleted = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            nodeToBeDeleted = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     if (renamingActive && renamingPath == node.path) {
         ImGui::SetNextItemWidth(itemSize);
@@ -516,7 +549,7 @@ void FileManagerPanel::drawItem(FileNode& node) {
             pendingNavigate = node.path;
         }
         else if (FileTypeController::isSceneFile(node.path)) {
-            SceneController::loadScene(node.path.stem().string());
+            SceneController::openScene(node.path);
         }
     }
 
@@ -548,6 +581,7 @@ void FileManagerPanel::drawContextMenuBackground() {
             strcpy(newFolderName, "New Folder");
             createFolderOpen = true;
         }
+        if (ImGui::MenuItem("Create Script")) importScriptPopupOpen = true;
         if (ImGui::MenuItem("Import Asset...")) importPopupOpen = true;
         if (ImGui::MenuItem("Refresh"))         refresh();
         ImGui::EndPopup();
@@ -568,16 +602,18 @@ void FileManagerPanel::drawContextMenuItem(FileNode& node) {
         }
         else if (FileTypeController::isSceneFile(node.path)) {
             if (ImGui::MenuItem("Open Scene"))
-                SceneController::loadScene(node.path.stem().string());
+                SceneController::openScene(node.path);
         }
         else if (FileTypeController::isMeshFile(node.path)) {
-            if (ImGui::MenuItem("Load Mesh")) {
-                AssetController::loadMesh(node.name);
+            std::string assetName;
+            if (ImGui::MenuItem("Load Mesh") && AssetController::getAssetName(node.path, assetName)) {
+                AssetController::loadMesh(assetName);
             }
         }
         else if (FileTypeController::isImageFile(node.path)) {
-            if (ImGui::MenuItem("Load Texture")) {
-                AssetController::loadTexture(node.name);
+            std::string assetName;
+            if (ImGui::MenuItem("Load Texture") && AssetController::getAssetName(node.path, assetName)) {
+                AssetController::loadTexture(assetName);
             }
         }
 
@@ -600,23 +636,8 @@ void FileManagerPanel::drawContextMenuItem(FileNode& node) {
         ImGui::Separator();
 
         if (ImGui::MenuItem("Delete")) {
-            ImGui::OpenPopup(("Delete?##" + node.path.string()).c_str());
-        }
-        if (ImGui::BeginPopupModal(("Delete?##" + node.path.string()).c_str(),
-            nullptr,
-            ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("Delete \"%s\"?\nThis cannot be undone.", node.name.c_str());
-            ImGui::Separator();
-            if (ImGui::Button("Delete", ImVec2(120, 0))) {
-                deleteItem(node);
-                ImGui::CloseCurrentPopup();
-                ImGui::EndPopup();
-                ImGui::EndPopup();
-                return;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
+            deletePopupTriggered = true;
+            nodeToBeDeleted = &node;
         }
 
         ImGui::EndPopup();

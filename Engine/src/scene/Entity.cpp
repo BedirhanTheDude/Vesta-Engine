@@ -1,66 +1,78 @@
 #include <scene/Entity.h>
 
-#include <persistance/Archive.h>
+#include <scene/Scene.h>
+#include <scene/components/TransformComponent.h>
+#include <scene/components/BehaviourComponent.h>
+#include <scene/components/ComponentFactory.h>
+#include <ecs/EntityHandle.h>
 
-inline std::string cleanTypeName(const std::string& name) {
-    const std::string prefix = "class ";
-    if (name.substr(0, prefix.size()) == prefix)
-        return name.substr(prefix.size());
-    return name;
+Entity::Entity(Scene* owningScene, const ECS::EntityHandle& handle)
+    : scene(owningScene), entityId(handle.entityId), generation(handle.generation) {
 }
 
-Entity::Entity(Scene* owningScene, const std::string& entityName, unsigned int ID, Entity* parent)
-: scene(owningScene), name(entityName) {
-	transform.owner = this;
-
-	if (parent) {
-		transform.setParent(&(parent->transform));
-	}
-
-    this->ID = ID;
+ECS::EntityHandle Entity::getHandle() const {
+    return { entityId, generation };
 }
 
-Entity::Entity(Scene* owningScene, const std::string& entityName, unsigned int ID,
-	const glm::vec3& pos, const glm::vec3& rot,
-	const glm::vec3& scale, Entity* parent) : Entity(owningScene, entityName, ID, parent) {
-	transform.setPosition(pos);
-	transform.setRotation(rot);
-	transform.setScale(scale);
+std::string Entity::getName() const {
+    if (!isValid()) return std::string();
 
-    this->ID = ID;
+    return scene->getEntityName(getHandle());
 }
 
-void Entity::serialize(Archive& arch) const {
-    arch.set("name", name);
+void Entity::setName(const std::string& newName) const {
+    if (!isValid()) return;
 
-    TransformComponent* parent = transform.getParent();
-    if (parent && parent->owner)
-        arch.set("parent", parent->owner->getName());
-    else
-        arch.set("parent", std::string(""));
-
-    glm::vec3 worldPos = transform.getWorldPosition();
-    glm::quat worldRot = transform.getWorldRotationQuat();
-    glm::vec3 worldScl = transform.getWorldScale();
-
-    Archive transformArch;
-    transformArch.set("position", worldPos);
-    transformArch.set("rotation", worldRot);
-    transformArch.set("scale",    worldScl);
-    arch.set("transform", std::move(transformArch));
-
-    for (const auto& [idx, comp] : components) {
-        Archive cj;
-        cj.set("type", cleanTypeName(typeid(*comp).name()));
-        comp->serialize(cj);
-        arch.append("components", std::move(cj));
-    }
+    scene->renameEntity(getHandle(), newName);
 }
 
-TransformComponent& Entity::getTransform() {
-	return transform;
+bool Entity::isValid() const {
+    return scene != nullptr && entityId != ECS::INVALID_ENTITY_INDEX
+        && generation != ECS::INVALID_ENTITY_GENERATION;
 }
 
-const TransformComponent& Entity::getTransform() const {
-	return transform;
+bool Entity::isAlive() const {
+    return isValid() && scene->entityExists(getHandle());
+}
+
+TransformComponent Entity::getTransform() const {
+    return TransformComponent(*this);
+}
+
+bool Entity::hasComponent(unsigned int UID) const {
+    return isValid() && scene->hasComponent(getHandle(), UID);
+}
+
+BehaviourComponent* Entity::getBehaviour(unsigned int UID) const {
+    return getBehaviourRaw(UID);
+}
+
+void Entity::removeComponent(unsigned int UID) {
+    ComponentFactory::remove(UID, *this);
+}
+
+void Entity::addBuiltInRaw(unsigned int UID) const {
+    if (!isValid())
+        throw std::runtime_error("Cannot add a component to an invalid entity");
+
+    scene->addBuiltInComponent(getHandle(), UID);
+}
+
+void Entity::removeComponentRaw(unsigned int UID) const {
+    if (!isValid()) return;
+
+    scene->removeComponent(getHandle(), UID);
+}
+
+BehaviourComponent* Entity::addBehaviourRaw(unsigned int UID, std::unique_ptr<BehaviourComponent> behaviour) const {
+    if (!isValid())
+        throw std::runtime_error("Cannot add a component to an invalid entity");
+
+    return scene->addBehaviour(getHandle(), UID, std::move(behaviour));
+}
+
+BehaviourComponent* Entity::getBehaviourRaw(unsigned int UID) const {
+    if (!isValid()) return nullptr;
+
+    return scene->getBehaviour(getHandle(), UID);
 }

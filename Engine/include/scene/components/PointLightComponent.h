@@ -8,31 +8,36 @@ class Archive;
 
 class PointLightComponent : public Component {
 public:
-    PointLightComponent(float ambient = 0.1f, float diffuse = 1.0f, float specular = 0.8f,
-        float constant = 1.0f, float linear = 0.09f, float quadratic = 0.032f)
-        : ambientStrength(ambient), diffuseStrength(diffuse), specularStrength(specular),
-          constant(constant), linear(linear), quadratic(quadratic) {
-        registerProperty("Color", PropertyType::Color, &this->color);
+    explicit PointLightComponent(const Entity& entity) : Component(entity) {}
 
-        registerProperty("Ambient Strength", PropertyType::Float, &this->ambientStrength);
-        registerProperty("Diffuse Strength", PropertyType::Float, &this->diffuseStrength);
-        registerProperty("Specular Strength", PropertyType::Float, &this->specularStrength);
+    // what addComponent<PointLightComponent>(ambient, diffuse, ...) forwards to
+    void init(float ambient = 0.1f, float diffuse = 1.0f, float specular = 0.8f,
+        float constant = 1.0f, float linear = 0.09f, float quadratic = 0.032f);
 
-        registerProperty("Constant", PropertyType::Float, &this->constant);
-        registerProperty("Linear", PropertyType::Float, &this->linear);
-        registerProperty("Quadratic", PropertyType::Float, &this->quadratic);
-    }
+    glm::vec3 getColor() const;
+    void setColor(const glm::vec3& color);
 
-    glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
+    float getAmbientStrength() const;
+    void setAmbientStrength(float ambient);
 
-    float ambientStrength = 0.1f;
-    float diffuseStrength = 1.0f;
-    float specularStrength = 0.8f;
+    float getDiffuseStrength() const;
+    void setDiffuseStrength(float diffuse);
 
-    float constant = 1.0f;
-    float linear = 0.09f;
-    float quadratic = 0.032f;
+    float getSpecularStrength() const;
+    void setSpecularStrength(float specular);
 
-    void serialize(Archive& arch) const;
-    void deserialize(const Archive& arch);
+    float getConstant() const;
+    void setConstant(float constant);
+
+    float getLinear() const;
+    void setLinear(float linear);
+
+    float getQuadratic() const;
+    void setQuadratic(float quadratic);
+
+    void serialize(Archive& arch) const override;
+    void deserialize(const Archive& arch) override;
+
+    bool onAttach() { return true; }
+    void onDetach() {}
 };

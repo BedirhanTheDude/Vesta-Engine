@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glm/fwd.hpp>
+#include <glm/glm.hpp>
 
 #include <scene/components/Component.h>
 
@@ -8,17 +8,22 @@ class Archive;
 
 class CameraComponent : public Component {
 public:
-	CameraComponent(float fov = 45.0f, float aspect = 1.0f, float nearPlane = 0.1f, float farPlane = 100.0f) 
-		: fov(fov), aspect(aspect), nearPlane(nearPlane), farPlane(farPlane) {
-		registerProperty("FOV", PropertyType::Float, &this->fov);
-		registerProperty("Near", PropertyType::Float, &this->nearPlane);
-		registerProperty("Far", PropertyType::Float, &this->farPlane);
-	}
+	explicit CameraComponent(const Entity& entity) : Component(entity) {}
 
-	float fov;
-	float aspect; // obtained from current window
-	float nearPlane;
-	float farPlane;
+	// what addComponent<CameraComponent>(fov, aspect, near, far) forwards to
+	void init(float fov = 45.0f, float aspect = 1.0f, float nearPlane = 0.1f, float farPlane = 100.0f);
+
+	float getFov() const;
+	void setFov(float fov);
+
+	float getAspect() const;
+	void setAspect(float aspect);
+
+	float getNearPlane() const;
+	void setNearPlane(float nearPlane);
+
+	float getFarPlane() const;
+	void setFarPlane(float farPlane);
 
 	glm::mat4 getViewMatrix() const;
 	glm::mat4 getProjectionMatrix() const;

@@ -11,9 +11,75 @@
 #include <fstream>
 #include <unordered_map>
 
+#include <system_error>
+
 #include <core/AssetManager.h>
+#include <core/Project.h>
 #include <renderer/Material.h>
 #include <renderer/LoadedModel.h>
+
+namespace {
+    class PathMaterialReader : public tinyobj::MaterialReader {
+    public:
+        explicit PathMaterialReader(const std::filesystem::path& baseDirectory) : baseDirectory(baseDirectory) {}
+
+        bool operator()(const std::string& matId, std::vector<tinyobj::material_t>* materials,
+            std::map<std::string, int>* matMap, std::string* warn, std::string* err) override {
+            std::ifstream stream(baseDirectory / std::filesystem::u8path(matId));
+            if (!stream.is_open()) {
+                if (warn) *warn += "Material file not found: " + matId + '\n';
+                return false;
+            }
+
+            tinyobj::LoadMtl(matMap, materials, &stream, warn, err);
+            return true;
+        }
+
+    private:
+        std::filesystem::path baseDirectory;
+    };
+
+    bool loadObjFile(const std::filesystem::path& objPath, tinyobj::attrib_t& attrib,
+        std::vector<tinyobj::shape_t>& shapes, std::vector<tinyobj::material_t>& materials,
+        std::string& warn, std::string& err) {
+
+        std::ifstream stream(objPath);
+        if (!stream.is_open()) {
+            err = "Could not open " + objPath.string();
+            return false;
+        }
+
+        PathMaterialReader materialReader(objPath.parent_path());
+        return tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, &stream, &materialReader);
+    }
+
+    // mirrors the asset's project-relative path inside the cache, relativePath is already validated by Project::resolve
+    std::filesystem::path getCachePath(const std::string& relativePath, const char* extension) {
+        std::filesystem::path path = Project::getCacheDirectory() / "meshes" / std::filesystem::u8path(relativePath);
+        path += extension;
+        return path;
+    }
+
+    // a cache written before the source file was last modified is stale
+    bool isCacheCurrent(const std::filesystem::path& cachePath, const std::filesystem::path& sourcePath) {
+        std::error_code ec;
+        auto cacheTime = std::filesystem::last_write_time(cachePath, ec);
+        if (ec) return false;
+
+        auto sourceTime = std::filesystem::last_write_time(sourcePath, ec);
+        if (ec) return false;
+
+        return cacheTime >= sourceTime;
+    }
+
+    // byte size of an open binary stream, the read position is left at the start
+    size_t streamSize(std::ifstream& file) {
+        file.seekg(0, std::ios::end);
+        std::streamoff size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        return size > 0 ? static_cast<size_t>(size) : 0;
+    }
+}
 
 struct VertexKey {
     int pos, norm, tex;
@@ -31,11 +97,18 @@ struct VertexKeyHash {
     }
 };
 
-std::shared_ptr<Mesh> ObjLoader::load(const std::string& objName, bool forceLoadNew) {
+std::shared_ptr<Mesh> ObjLoader::load(const std::string& relativePath, bool forceLoadNew) {
+    std::filesystem::path objPath;
+    if (!Project::resolve(relativePath, objPath)) {
+        std::cerr << "OBJ load failed: \"" << relativePath << "\" is not a path inside the project" << std::endl;
+        return nullptr;
+    }
+
+    std::filesystem::path cachePath = getCachePath(relativePath, ".mesh.cache");
 
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-    if (!forceLoadNew && loadCache(objName, vertices, indices)) {
+    if (!forceLoadNew && isCacheCurrent(cachePath, objPath) && loadCache(cachePath, vertices, indices)) {
         return std::make_shared<Mesh>(vertices, indices);
     }
 
@@ -44,10 +117,7 @@ std::shared_ptr<Mesh> ObjLoader::load(const std::string& objName, bool forceLoad
     std::vector<tinyobj::material_t> materials;
     std::string warn, err;
 
-    std::filesystem::path modelDir = std::filesystem::current_path() / "assets" / "models" / objName;
-    std::filesystem::path mtlDir = std::filesystem::current_path() / "assets" / "models";
-
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, modelDir.u8string().c_str(), mtlDir.u8string().c_str())) {
+    if (!loadObjFile(objPath, attrib, shapes, materials, warn, err)) {
         std::cerr << "OBJ load failed: " << err << std::endl;
         return nullptr;
     }
@@ -131,20 +201,19 @@ std::shared_ptr<Mesh> ObjLoader::load(const std::string& objName, bool forceLoad
             v.position *= scale;
     }
 
-    saveCache(objName, vertices, indices);
+    saveCache(cachePath, vertices, indices);
     return std::make_shared<Mesh>(vertices, indices);
 }
 
-LoadedModel ObjLoader::loadModel(const std::string& objName) {
-    std::filesystem::path filePath = std::filesystem::current_path() / "assets" / "models" / objName;
-    std::filesystem::path mtlDir = filePath.parent_path();
+LoadedModel ObjLoader::loadModel(const std::string& relativePath) {
+    std::filesystem::path filePath;
+    if (!Project::resolve(relativePath, filePath)) {
+        std::cerr << "OBJ load failed: \"" << relativePath << "\" is not a path inside the project" << '\n';
+        return {};
+    }
 
-    size_t dot = objName.find_last_of(".");
-    std::string mtlName;
-    if (dot != std::string::npos)
-        mtlName = objName.substr(0, dot);
-    else
-        mtlName = objName;
+    std::filesystem::path mtlDir = filePath.parent_path();
+    std::filesystem::path cachePath = getCachePath(relativePath, ".model.cache");
 
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -159,7 +228,7 @@ LoadedModel ObjLoader::loadModel(const std::string& objName) {
     std::vector<SubMesh> submeshes;
     std::shared_ptr<Mesh> mesh = nullptr;
 
-    cacheHit = loadModelCache(objName, vertices, indices, submeshes);
+    cacheHit = isCacheCurrent(cachePath, filePath) && loadModelCache(cachePath, vertices, indices, submeshes);
 
     if (cacheHit) {
         mesh = std::make_shared<Mesh>(vertices, indices);
@@ -178,7 +247,7 @@ LoadedModel ObjLoader::loadModel(const std::string& objName) {
         }
 
         if (!mtlFile.empty()) {
-            std::ifstream mtlStream(mtlDir / mtlFile);
+            std::ifstream mtlStream(mtlDir / std::filesystem::u8path(mtlFile));
             if (mtlStream.is_open())
                 tinyobj::LoadMtl(&matMap, &tinyMaterials, &mtlStream, &warn, &err);
         }
@@ -186,19 +255,11 @@ LoadedModel ObjLoader::loadModel(const std::string& objName) {
         loaded = true;
     }
     else {
-        loaded = tinyobj::LoadObj(
-            &attrib,
-            &shapes,
-            &tinyMaterials,
-            &warn,
-            &err,
-            filePath.u8string().c_str(),
-            mtlDir.u8string().c_str()
-        );
+        loaded = loadObjFile(filePath, attrib, shapes, tinyMaterials, warn, err);
     }
 
     if (cacheHit)
-        std::cout << objName << " loaded from cache" << '\n';
+        std::cout << relativePath << " loaded from cache" << '\n';
 
     if (!warn.empty())
         std::cerr << "OBJ warning: " << warn << '\n';
@@ -230,8 +291,14 @@ LoadedModel ObjLoader::loadModel(const std::string& objName) {
         printf("mat %s dissolve=%.2f transparent=%d\n",
             tmat.name.c_str(), tmat.dissolve, mat->transparent);
 
+        // .mtl texture paths are relative to the .mtl's own directory
         if (!tmat.diffuse_texname.empty()) {
-            mat->diffuseTexture = AssetManager::getTexture(tmat.diffuse_texname);
+            std::string textureKey;
+            if (Project::toRelative(mtlDir / std::filesystem::u8path(tmat.diffuse_texname), textureKey))
+                mat->diffuseTexture = AssetManager::getTexture(textureKey);
+            else
+                std::cerr << "Texture \"" << tmat.diffuse_texname << "\" of " << relativePath
+                    << " is outside the project, skipped" << '\n';
         }
 
         materials.push_back(mat);
@@ -370,7 +437,7 @@ LoadedModel ObjLoader::loadModel(const std::string& objName) {
     indices.shrink_to_fit();
     submeshes.shrink_to_fit();
 
-    saveModelCache(objName, vertices, indices, submeshes);
+    saveModelCache(cachePath, vertices, indices, submeshes);
 
     mesh = std::make_shared<Mesh>(vertices, indices);
     mesh->setSubMeshes(submeshes);
@@ -380,16 +447,18 @@ LoadedModel ObjLoader::loadModel(const std::string& objName) {
 
 // Directly write obj data to a binary file once loaded
 // because it is faster to read compared to tinyobjloader
-void ObjLoader::saveCache(const std::string& objName,
+void ObjLoader::saveCache(const std::filesystem::path& cachePath,
     const std::vector<Vertex>& vertices,
     const std::vector<unsigned int>& indices) {
 
-    std::filesystem::path cacheDir = std::filesystem::current_path() / "assets" / "models" / "OBJCache";
+    std::error_code ec;
+    std::filesystem::create_directories(cachePath.parent_path(), ec);
 
-    std::filesystem::create_directories(cacheDir);
-    std::filesystem::path filePath = std::filesystem::current_path() / "assets" / "models" / "OBJCache" / (objName + ".mesh.cache");
-    
-    std::ofstream file(filePath, std::ios::binary);
+    std::ofstream file(cachePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Could not write mesh cache " << cachePath << '\n';
+        return;
+    }
 
     size_t vertCount = vertices.size();
     size_t idxCount = indices.size();
@@ -401,21 +470,30 @@ void ObjLoader::saveCache(const std::string& objName,
 }
 
 // Checks if cache exists, if so load vertices and indices and return true, if not return false
-bool ObjLoader::loadCache(const std::string& objName,
+bool ObjLoader::loadCache(const std::filesystem::path& cachePath,
     std::vector<Vertex>& vertices,
     std::vector<unsigned int>& indices) {
 
-    std::filesystem::path filePath = std::filesystem::current_path() / "assets" / "models" / "OBJCache" / (objName + ".mesh.cache");
-    std::ifstream file(filePath, std::ios::binary);
+    std::ifstream file(cachePath, std::ios::binary);
 
     if (!file.is_open()) return false;
 
     vertices.clear();
     indices.clear();
 
-    size_t vertCount, idxCount;
+    const size_t fileSize = streamSize(file);
+    constexpr size_t headerSize = 2 * sizeof(size_t);
+    if (fileSize < headerSize) return false;
+
+    size_t vertCount = 0, idxCount = 0;
     file.read(reinterpret_cast<char*>(&vertCount), sizeof(size_t));
     file.read(reinterpret_cast<char*>(&idxCount), sizeof(size_t));
+
+    // a truncated or corrupted cache mustn't turn into a giant resize, the counts have to match the file exactly
+    size_t payload = fileSize - headerSize;
+    if (vertCount > payload / sizeof(Vertex)) return false;
+    payload -= vertCount * sizeof(Vertex);
+    if (idxCount > payload / sizeof(unsigned int) || idxCount * sizeof(unsigned int) != payload) return false;
 
     vertices.resize(vertCount);
     indices.resize(idxCount);
@@ -423,19 +501,22 @@ bool ObjLoader::loadCache(const std::string& objName,
     file.read(reinterpret_cast<char*>(vertices.data()), vertCount * sizeof(Vertex));
     file.read(reinterpret_cast<char*>(indices.data()), idxCount * sizeof(unsigned int));
 
-    return true;
+    return static_cast<bool>(file);
 }
 
-void ObjLoader::saveModelCache(const std::string& objName,
+void ObjLoader::saveModelCache(const std::filesystem::path& cachePath,
                           const std::vector<Vertex>& vertices,
                           const std::vector<unsigned int>& indices,
                           const std::vector<SubMesh>& submeshes) {
 
-    std::filesystem::path cacheDir = std::filesystem::current_path() / "assets" / "models" / "OBJCache";
+    std::error_code ec;
+    std::filesystem::create_directories(cachePath.parent_path(), ec);
 
-    std::filesystem::create_directories(cacheDir);
-    std::filesystem::path filePath = std::filesystem::current_path() / "assets" / "models" / "OBJCache" / (objName + ".model.cache");
-    std::ofstream file(filePath, std::ios::binary);
+    std::ofstream file(cachePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Could not write model cache " << cachePath << '\n';
+        return;
+    }
 
     size_t vertCount = vertices.size();
     size_t idxCount = indices.size();
@@ -449,23 +530,35 @@ void ObjLoader::saveModelCache(const std::string& objName,
     file.write(reinterpret_cast<const char*>(submeshes.data()), subCount * sizeof(SubMesh));
 }
 
-bool ObjLoader::loadModelCache(const std::string& objName,
+bool ObjLoader::loadModelCache(const std::filesystem::path& cachePath,
                           std::vector<Vertex>& vertices,
                           std::vector<unsigned int>& indices,
                           std::vector<SubMesh>& submeshes) {
 
-    std::filesystem::path filePath = std::filesystem::current_path() / "assets" / "models" / "OBJCache" / (objName + ".model.cache");
-    std::ifstream file(filePath, std::ios::binary);
+    std::ifstream file(cachePath, std::ios::binary);
 
     if (!file.is_open()) return false;
 
     vertices.clear();
     indices.clear();
+    submeshes.clear();
 
-    size_t vertCount, idxCount, subCount;
+    const size_t fileSize = streamSize(file);
+    const size_t headerSize = 3 * sizeof(size_t);
+    if (fileSize < headerSize) return false;
+
+    size_t vertCount = 0, idxCount = 0, subCount = 0;
     file.read(reinterpret_cast<char*>(&vertCount), sizeof(size_t));
     file.read(reinterpret_cast<char*>(&idxCount), sizeof(size_t));
     file.read(reinterpret_cast<char*>(&subCount), sizeof(size_t));
+
+    // same exact-size check as loadCache
+    size_t payload = fileSize - headerSize;
+    if (vertCount > payload / sizeof(Vertex)) return false;
+    payload -= vertCount * sizeof(Vertex);
+    if (idxCount > payload / sizeof(unsigned int)) return false;
+    payload -= idxCount * sizeof(unsigned int);
+    if (subCount > payload / sizeof(SubMesh) || subCount * sizeof(SubMesh) != payload) return false;
 
     vertices.resize(vertCount);
     indices.resize(idxCount);
@@ -475,5 +568,5 @@ bool ObjLoader::loadModelCache(const std::string& objName,
     file.read(reinterpret_cast<char*>(indices.data()), idxCount * sizeof(unsigned int));
     file.read(reinterpret_cast<char*>(submeshes.data()), subCount * sizeof(SubMesh));
 
-    return true;
+    return static_cast<bool>(file);
 }

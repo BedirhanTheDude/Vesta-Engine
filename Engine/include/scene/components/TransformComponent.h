@@ -5,16 +5,11 @@
 
 #include <scene/components/Component.h>
 
-#include <set>
 #include <vector>
-#include <functional>
-
-class Archive;
 
 class TransformComponent : public Component {
 public:
-	TransformComponent();
-	~TransformComponent();
+	explicit TransformComponent(const Entity& entity) : Component(entity) {}
 
 	glm::mat4 getMatrix() const;
 
@@ -24,16 +19,19 @@ public:
 	void setRotation(const glm::vec3& eulerAngles);
 	void setRotation(const glm::quat& quat);
 	void rotate(const glm::vec3& eulerDelta);
+	void rotateX(float angleDegrees);
+	void rotateY(float angleDegrees);
+	void rotateZ(float angleDegrees);
 	void rotateAroundAxis(const glm::vec3& axis, float angle);
+	void rotateAroundLocalAxis(const glm::vec3& localAxis, float angle);
 
 	void setScale(const glm::vec3& scale);
 	void scaleBy(const glm::vec3& factor);
 
-	void serialize(Archive& arch) const override;
-	void deserialize(const Archive& arch) override;
-
-	void setParent(TransformComponent* newParent);
-	void removeChild(TransformComponent* child);
+	// Keeps the world transform. Reparenting onto itself, onto one of its own descendants or
+	// onto an entity of another scene is ignored, so is reparenting an entity that has a
+	// RigidBodyComponent. The invalid Entity() unparents.
+	void setParent(const Entity& newParent);
 
 	glm::mat3 getRotationMatrix() const;
 
@@ -51,29 +49,11 @@ public:
 	glm::quat getWorldRotationQuat() const;
 	glm::vec3 getWorldScale() const;
 
-	TransformComponent* getParent() const { return parent; }
-	const std::vector<TransformComponent*>& getChildren() const { return children; }
-	const std::set<unsigned int>& getChildrenIDs() const { return childrenIDs; }
+	// Transform serialization/deserialization is tied to entity serialization/deserialization since it always exists
+	void serialize(Archive& arch) const override {};
+	void deserialize(const Archive& arch) override {};
 
-	std::function<bool()> onBeforeReparent = nullptr;
-
-	mutable bool physicsDirty = true;
-private:
-	void invalidate();
-
-	TransformComponent* parent = nullptr;
-	std::vector<TransformComponent*> children;
-	std::set<unsigned int> childrenIDs;
-
-	mutable bool isMatrixValid = false;
-	mutable bool worldEulerValid = false;
-	mutable glm::mat4 modelMatrix = glm::mat4(1.0f);
-	mutable glm::vec3 cachedWorldEuler = glm::vec3(0.0f);
-
-	glm::vec3 position{ 0.0f, 0.0f, 0.0f };
-	glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
-	glm::vec3 scale{ 1.0f, 1.0f, 1.0f };
-
-	mutable bool eulerDirty = true;
-	mutable glm::vec3 cachedEuler{ 0.0f };
+	// The invalid Entity() if there is no parent. A parent that was removed reports isAlive() == false.
+	Entity getParent() const;
+	std::vector<Entity> getChildren() const;
 };

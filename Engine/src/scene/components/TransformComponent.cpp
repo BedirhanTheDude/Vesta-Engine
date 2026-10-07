@@ -1,298 +1,200 @@
-#define GLM_ENABLE_EXPERIMENTAL
-
-#include <scene/Entity.h>
 #include <scene/components/TransformComponent.h>
 
-#include <persistance/Archive.h>
-
-#include <cmath>
-
-#include <glm/gtx/norm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-static float wrap360(float a)
-{
-    while (a > 360.0f)
-        a -= 360.0f;
-
-    while (a < -360.0f)
-        a += 360.0f;
-
-    return a;
-}
-
-static glm::vec3 wrapEuler360(glm::vec3 e)
-{
-    return {
-        wrap360(e.x),
-        wrap360(e.y),
-        wrap360(e.z)
-    };
-}
-
-static float wrap180(float a)
-{
-    return glm::degrees(glm::atan(glm::sin(glm::radians(a)), glm::cos(glm::radians(a))));
-}
-
-static float nearestAngleDegrees(float angle, float reference)
-{
-    return reference + wrap180(angle - reference);
-}
-
-static glm::vec3 closestEulerDegrees(glm::quat q, glm::vec3 previousDegrees)
-{
-    glm::vec3 e = glm::degrees(glm::eulerAngles(glm::normalize(q)));
-
-    e.x = nearestAngleDegrees(e.x, previousDegrees.x);
-    e.y = nearestAngleDegrees(e.y, previousDegrees.y);
-    e.z = nearestAngleDegrees(e.z, previousDegrees.z);
-
-    return e;
-}
-
-TransformComponent::TransformComponent() = default;
-
-TransformComponent::~TransformComponent()
-{
-    if (parent)
-        parent->removeChild(this);
-
-    for (auto* child : children)
-        child->parent = nullptr;
-}
-
-void TransformComponent::serialize(Archive& arch) const {};
-void TransformComponent::deserialize(const Archive& arch) {};
+#include <scene/components/Transform.h>
+#include <scene/components/ProxyUtil.h>
+#include <scene/system/TransformSystem.h>
 
 glm::mat4 TransformComponent::getMatrix() const
 {
-    if (isMatrixValid)
-        return modelMatrix;
+    Transform* transform = resolveComponent<Transform>(entity);
+    if (!transform) return glm::mat4(1.0f);
 
-    glm::mat4 local = glm::mat4(1.0f);
-    local = glm::translate(local, position);
-    local *= glm::mat4_cast(rotation);
-    local = glm::scale(local, scale);
-
-    modelMatrix = parent ? parent->getMatrix() * local : local;
-    isMatrixValid = true;
-
-    return modelMatrix;
-}
-
-void TransformComponent::invalidate()
-{
-    isMatrixValid = false;
-    worldEulerValid = false;
-    physicsDirty = true;
-
-    for (auto* child : children)
-        child->invalidate();
-}
-
-void TransformComponent::setParent(TransformComponent* newParent)
-{
-    if (onBeforeReparent && !onBeforeReparent())
-        return;
-
-    if (parent == newParent)
-        return;
-
-    glm::mat4 worldMatrix = getMatrix();
-
-    if (parent)
-        parent->removeChild(this);
-
-    parent = newParent;
-
-    if (parent) {
-        parent->children.push_back(this);
-        parent->childrenIDs.insert(this->owner->getID());
-    }
-        
-    if (parent) {
-        glm::mat4 localMatrix = glm::inverse(parent->getMatrix()) * worldMatrix;
-
-        position = glm::vec3(localMatrix[3]);
-
-        scale = glm::vec3(
-            glm::length(glm::vec3(localMatrix[0])),
-            glm::length(glm::vec3(localMatrix[1])),
-            glm::length(glm::vec3(localMatrix[2]))
-        );
-
-        glm::mat3 rotMat(
-            glm::vec3(localMatrix[0]) / scale.x,
-            glm::vec3(localMatrix[1]) / scale.y,
-            glm::vec3(localMatrix[2]) / scale.z
-        );
-
-        rotation = glm::normalize(glm::quat_cast(rotMat));
-
-        cachedEuler = wrapEuler360(closestEulerDegrees(rotation, cachedEuler));
-        eulerDirty = false;
-    }
-
-    invalidate();
-}
-
-void TransformComponent::removeChild(TransformComponent* child)
-{
-    childrenIDs.erase(child->owner->getID());
-    children.erase(std::remove(children.begin(), children.end(), child), children.end());
-    invalidate();
+    return TransformSystem::getMatrix(*transform, sceneOf(entity));
 }
 
 void TransformComponent::translate(const glm::vec3& delta)
 {
-    position += delta;
-    invalidate();
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::translate(*transform, delta, sceneOf(entity));
 }
 
 void TransformComponent::setPosition(const glm::vec3& pos)
 {
-    position = pos;
-    invalidate();
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::setPosition(*transform, pos, sceneOf(entity));
 }
 
 void TransformComponent::setRotation(const glm::vec3& eulerDegrees)
 {
-    cachedEuler = wrapEuler360(eulerDegrees);
-    eulerDirty = false;
-
-    rotation = glm::normalize(glm::quat(glm::radians(cachedEuler)));
-
-    invalidate();
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::setRotation(*transform, eulerDegrees, sceneOf(entity));
 }
 
 void TransformComponent::setRotation(const glm::quat& quat)
 {
-    rotation = glm::normalize(quat);
-    eulerDirty = true;
-
-    invalidate();
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::setRotation(*transform, quat, sceneOf(entity));
 }
 
 void TransformComponent::rotate(const glm::vec3& eulerDeltaDegrees)
 {
-    glm::vec3 wrappedDelta = wrapEuler360(eulerDeltaDegrees);
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotate(*transform, eulerDeltaDegrees, sceneOf(entity));
+}
 
-    glm::quat delta = glm::quat(glm::radians(wrappedDelta));
-    rotation = glm::normalize(delta * rotation);
+void TransformComponent::rotateX(float angleDegrees) {
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, glm::vec3(1.0f, 0.0f, 0.0f),
+            angleDegrees, sceneOf(entity));
+}
 
-    eulerDirty = true;
+void TransformComponent::rotateY(float angleDegrees) {
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, glm::vec3(0.0f, 1.0f, 0.0f),
+            angleDegrees, sceneOf(entity));
+}
 
-    invalidate();
+void TransformComponent::rotateZ(float angleDegrees) {
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, glm::vec3(0.0f, 0.0f, 1.0f),
+            angleDegrees, sceneOf(entity));
 }
 
 void TransformComponent::rotateAroundAxis(const glm::vec3& axis, float angleDegrees)
 {
-    if (glm::length2(axis) == 0.0f)
-        return;
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundAxis(*transform, axis, angleDegrees, sceneOf(entity));
+}
 
-    float wrappedAngle = wrap360(angleDegrees);
-
-    rotation = glm::normalize(
-        glm::angleAxis(glm::radians(wrappedAngle), glm::normalize(axis)) * rotation
-    );
-
-    eulerDirty = true;
-
-    invalidate();
+void TransformComponent::rotateAroundLocalAxis(const glm::vec3& localAxis, float angleDegrees)
+{
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::rotateAroundLocalAxis(*transform, localAxis, angleDegrees, sceneOf(entity));
 }
 
 void TransformComponent::setScale(const glm::vec3& scale)
 {
-    this->scale = scale;
-    invalidate();
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::setScale(*transform, scale, sceneOf(entity));
 }
 
 void TransformComponent::scaleBy(const glm::vec3& factor)
 {
-    scale *= factor;
-    invalidate();
+    if (Transform* transform = resolveComponent<Transform>(entity))
+        TransformSystem::scaleBy(*transform, factor, sceneOf(entity));
+}
+
+void TransformComponent::setParent(const Entity& newParent)
+{
+    Transform* transform = resolveComponent<Transform>(entity);
+    if (!transform) return;
+
+    // a parent from another scene has no meaning in this scene's pools
+    if (newParent.isValid() && sceneOf(newParent) != sceneOf(entity)) return;
+
+    ECS::EntityHandle parentHandle = newParent.isValid() ? newParent.getHandle() : ECS::INVALID_ENTITY_HANDLE;
+
+    TransformSystem::setParent(*transform, entity.getHandle(), parentHandle, sceneOf(entity));
 }
 
 glm::mat3 TransformComponent::getRotationMatrix() const
 {
-    return glm::mat3_cast(rotation);
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getRotationMatrix(*transform) : glm::mat3(1.0f);
 }
 
 glm::vec3 TransformComponent::forward() const
 {
-    return glm::normalize(rotation * glm::vec3(0, 0, -1));
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::forward(*transform) : glm::vec3(0.0f, 0.0f, -1.0f);
 }
 
 glm::vec3 TransformComponent::right() const
 {
-    return glm::normalize(rotation * glm::vec3(1, 0, 0));
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::right(*transform) : glm::vec3(1.0f, 0.0f, 0.0f);
 }
 
 glm::vec3 TransformComponent::up() const
 {
-    return glm::normalize(rotation * glm::vec3(0, 1, 0));
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::up(*transform) : glm::vec3(0.0f, 1.0f, 0.0f);
 }
 
 glm::vec3 TransformComponent::getPosition() const
 {
-    return position;
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getPosition(*transform) : glm::vec3(0.0f);
 }
 
 glm::vec3 TransformComponent::getEulerRotation() const
 {
-    if (eulerDirty) {
-        cachedEuler = wrapEuler360(closestEulerDegrees(rotation, cachedEuler));
-        eulerDirty = false;
-    }
-
-    return cachedEuler;
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getEulerRotation(*transform) : glm::vec3(0.0f);
 }
 
 glm::quat TransformComponent::getRotationQuat() const
 {
-    return rotation;
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getRotationQuat(*transform) : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 glm::vec3 TransformComponent::getRawEulerRotation() const
 {
-    return wrapEuler360(glm::degrees(glm::eulerAngles(rotation)));
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getRawEulerRotation(*transform) : glm::vec3(0.0f);
 }
 
 glm::vec3 TransformComponent::getScale() const
 {
-    return scale;
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getScale(*transform) : glm::vec3(1.0f);
 }
 
 glm::vec3 TransformComponent::getWorldPosition() const
 {
-    return glm::vec3(getMatrix()[3]);
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getWorldPosition(*transform, sceneOf(entity)) : glm::vec3(0.0f);
 }
 
 glm::vec3 TransformComponent::getWorldEulerAngles() const
 {
-    glm::quat world = getWorldRotationQuat();
-
-    if (!worldEulerValid) {
-        cachedWorldEuler = wrapEuler360(closestEulerDegrees(world, cachedWorldEuler));
-        worldEulerValid = true;
-    }
-
-    return cachedWorldEuler;
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getWorldEulerAngles(*transform, sceneOf(entity)) : glm::vec3(0.0f);
 }
 
 glm::quat TransformComponent::getWorldRotationQuat() const
 {
-    if (!parent)
-        return rotation;
-
-    return glm::normalize(parent->getWorldRotationQuat() * rotation);
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getWorldRotationQuat(*transform, sceneOf(entity)) : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 glm::vec3 TransformComponent::getWorldScale() const
 {
-    if (!parent)
-        return scale;
+    Transform* transform = resolveComponent<Transform>(entity);
+    return transform ? TransformSystem::getWorldScale(*transform, sceneOf(entity)) : glm::vec3(1.0f);
+}
 
-    return parent->getWorldScale() * scale;
+Entity TransformComponent::getParent() const
+{
+    Transform* transform = resolveComponent<Transform>(entity);
+
+    ECS::EntityHandle parentHandle;
+    if (!transform || !TransformSystem::tryGetParent(*transform, parentHandle))
+        return Entity();
+
+    return Entity(sceneOf(entity), parentHandle);
+}
+
+std::vector<Entity> TransformComponent::getChildren() const
+{
+    std::vector<Entity> children;
+
+    Transform* transform = resolveComponent<Transform>(entity);
+    if (!transform) return children;
+
+    for (const ECS::EntityHandle& childHandle : TransformSystem::getChildren(*transform))
+        children.push_back(Entity(sceneOf(entity), childHandle));
+
+    return children;
 }

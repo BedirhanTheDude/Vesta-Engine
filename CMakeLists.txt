@@ -13,19 +13,112 @@ set(BUILD_SHARED_LIBS OFF)
 find_package(OpenGL REQUIRED)
 
 # Engine sources
-file(GLOB PHYSICS_SRC         CONFIGURE_DEPENDS Engine/src/physics/*.cpp)
-file(GLOB PHYSICS_BODY_SRC    CONFIGURE_DEPENDS Engine/src/physics/body/*.cpp)
-file(GLOB SCENE_SRC           CONFIGURE_DEPENDS Engine/src/scene/*.cpp)
-file(GLOB SCENE_COMPONENT_SRC CONFIGURE_DEPENDS Engine/src/scene/components/*.cpp)
-file(GLOB RENDERER_SRC        CONFIGURE_DEPENDS Engine/src/renderer/*.cpp)
-file(GLOB CORE_SRC            CONFIGURE_DEPENDS Engine/src/core/*.cpp)
-file(GLOB PROPERTY_SRC        CONFIGURE_DEPENDS Engine/src/property/*.cpp)
-file(GLOB PERSISTANCE_SRC     CONFIGURE_DEPENDS Engine/src/persistance/*.cpp)
-file(GLOB SCRIPTING_SRC       CONFIGURE_DEPENDS Engine/src/scripting/*.cpp)
+# Engine sources
+set(PHYSICS_SRC
+    Engine/src/physics/CollisionShape.cpp
+    Engine/src/physics/PhysicsMaterial.cpp
+    Engine/src/physics/PhysicsWorld.cpp
+)
+
+set(PHYSICS_BODY_SRC
+    Engine/src/physics/body/DynamicPhysicsBody.cpp
+    Engine/src/physics/body/PhysicsBody.cpp
+    Engine/src/physics/body/StaticPhysicsBody.cpp
+)
+
+set(SCENE_SRC
+    Engine/src/scene/Entity.cpp
+    Engine/src/scene/Scene.cpp
+)
+
+set(SCENE_COMPONENT_SRC
+    Engine/src/scene/components/BehaviourComponent.cpp
+    Engine/src/scene/components/CameraComponent.cpp
+    Engine/src/scene/components/ComponentFactory.cpp
+    Engine/src/scene/components/DirectionalLightComponent.cpp
+    Engine/src/scene/components/MaterialComponent.cpp
+    Engine/src/scene/components/MeshComponent.cpp
+    Engine/src/scene/components/PointLightComponent.cpp
+    Engine/src/scene/components/RigidBodyComponent.cpp
+    Engine/src/scene/components/TransformComponent.cpp
+)
+
+set(SCENE_SYSTEM_SRC
+    Engine/src/scene/system/CameraSystem.cpp
+    Engine/src/scene/system/DirectionalLightSystem.cpp
+    Engine/src/scene/system/MaterialSystem.cpp
+    Engine/src/scene/system/MeshSystem.cpp
+    Engine/src/scene/system/PointLightSystem.cpp
+    Engine/src/scene/system/RigidBodySystem.cpp
+    Engine/src/scene/system/RenderingSystem.cpp
+    Engine/src/scene/system/TransformSystem.cpp
+)
+
+set(RENDERER_SRC
+    Engine/src/renderer/Colourpickingrenderer.cpp
+    Engine/src/renderer/Material.cpp
+    Engine/src/renderer/Mesh.cpp
+    Engine/src/renderer/ObjLoader.cpp
+    Engine/src/renderer/PrimitiveFactory.cpp
+    Engine/src/renderer/Renderer.cpp
+    Engine/src/renderer/ShaderProgram.cpp
+    Engine/src/renderer/Texture.cpp
+    Engine/src/renderer/ViewportFramebuffer.cpp
+    Engine/src/renderer/stb_impl.cpp
+)
+
+set(CORE_SRC
+    Engine/src/core/Application.cpp
+    Engine/src/core/AssetManager.cpp
+    Engine/src/core/Input.cpp
+    Engine/src/core/Project.cpp
+)
+
+set(ECS_SRC
+    Engine/src/ecs/EntityManager.cpp
+    Engine/src/ecs/ComponentPoolRegistry.cpp
+)
+
+set(PROPERTY_SRC
+    Engine/src/property/ComponentReflection.cpp
+    Engine/src/property/PropertySerializer.cpp
+)
+
+set(PERSISTANCE_SRC
+    Engine/src/persistance/Archive.cpp
+    Engine/src/persistance/SceneSerializer.cpp
+)
+
+set(SCRIPTING_SRC
+    Engine/src/scripting/ScriptCompiler.cpp
+    Engine/src/scripting/ScriptLoader.cpp
+)
 
 # Editor sources
-file(GLOB GUI_SRC             CONFIGURE_DEPENDS Editor/gui/*.cpp)
-file(GLOB CONTROLLER_SRC      CONFIGURE_DEPENDS Editor/controller/*.cpp)
+set(GUI_SRC
+    Editor/gui/EditorCamera.cpp
+    Editor/gui/EditorLayer.cpp
+    Editor/gui/FileManagerPanel.cpp
+    Editor/gui/HierarchyPanel.cpp
+    Editor/gui/ImGuiLayer.cpp
+)
+
+set(CONTROLLER_SRC
+    Editor/controller/AssetController.cpp
+    Editor/controller/ComponentController.cpp
+    Editor/controller/EditorSelectionController.cpp
+    Editor/controller/EntityController.cpp
+    Editor/controller/FileTypeController.cpp
+    Editor/controller/ProjectController.cpp
+    Editor/controller/SceneController.cpp
+    Editor/controller/ScriptingController.cpp
+    Editor/controller/TransformController.cpp
+    Editor/controller/WindowController.cpp
+)
+
+set(PLATFORM_SRC
+    Editor/platform/FileDialog.cpp
+)
 
 set(IMGUI_SRC
     external/imgui/imgui.cpp
@@ -43,10 +136,12 @@ add_library(Engine SHARED
     ${PERSISTANCE_SRC}
     ${PROPERTY_SRC}
     ${CORE_SRC}
+    ${ECS_SRC}
     ${PHYSICS_SRC}
     ${PHYSICS_BODY_SRC}
     ${SCENE_SRC}
     ${SCENE_COMPONENT_SRC}
+    ${SCENE_SYSTEM_SRC}
     ${RENDERER_SRC}
     ${SCRIPTING_SRC}
     Engine/src/renderer/glad.c
@@ -82,12 +177,10 @@ target_compile_definitions(Engine
     INTERFACE GLAD_GLAPI_EXPORT
 )
 
-target_compile_definitions(Engine PUBLIC
-    SHADER_PATH=u8"${CMAKE_SOURCE_DIR}/assets/shaders/"
-    MODEL_PATH=u8"${CMAKE_SOURCE_DIR}/assets/models/"
-    SCENES_PATH=u8"${CMAKE_SOURCE_DIR}/assets/scenes/"
-    ASSETS_PATH=u8"${CMAKE_SOURCE_DIR}/assets/"
-    SCRIPTS_PATH="${CMAKE_SOURCE_DIR}/Sandbox/scripts/"
+# built-in shaders are read straight from the source tree, so edits don't need a copy step
+# NOTE: this makes the exe depend on the source tree, a distributable build has to copy them next to the exe instead
+target_compile_definitions(Engine PRIVATE
+    VESTA_ENGINE_SHADER_DIR=u8"${CMAKE_SOURCE_DIR}/Engine/src/renderer/shaders/"
 )
 
 if (MSVC)
@@ -98,6 +191,7 @@ endif()
 add_library(Editor STATIC
     ${GUI_SRC}
     ${CONTROLLER_SRC}
+    ${PLATFORM_SRC}
     ${IMGUI_SRC}
 )
 
@@ -111,11 +205,14 @@ target_include_directories(Editor PUBLIC
 target_link_libraries(Editor PUBLIC Engine)
 
 # Editor (Sandbox.exe)
-file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY Sandbox/icon.png DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY Sandbox/src/scripts DESTINATION ${CMAKE_BINARY_DIR})
 
 add_executable(Sandbox Sandbox/src/main.cpp)
+
+# opened when there is no project on the command line and no last opened project
+target_compile_definitions(Sandbox PRIVATE
+    VESTA_SAMPLE_PROJECT=u8"${CMAKE_SOURCE_DIR}/SampleProject"
+)
 
 if(WIN32)
     target_sources(Sandbox PRIVATE Sandbox/resources.rc)
@@ -154,7 +251,8 @@ add_custom_command(TARGET Sandbox POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/glm/glm $<TARGET_FILE_DIR:Sandbox>/include/glm
 )
 
-file(GLOB_RECURSE SCRIPT_HEADERS CONFIGURE_DEPENDS Sandbox/src/scripts/*.h)
+file(GLOB_RECURSE SCRIPT_HEADERS CONFIGURE_DEPENDS SampleProject/*.h)
+list(FILTER SCRIPT_HEADERS EXCLUDE REGEX "/\\.[^/]*/")
 if(SCRIPT_HEADERS)
     add_library(ScriptsIntelliSense EXCLUDE_FROM_ALL ${SCRIPT_HEADERS})
     set_target_properties(ScriptsIntelliSense PROPERTIES LINKER_LANGUAGE CXX)

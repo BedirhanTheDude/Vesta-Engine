@@ -15,7 +15,7 @@ class EditorLayer {
 public:
     void Init(std::function<void()> onExit);
 
-    void initFileManager(const std::string& rootAssetsPath, const std::string& scriptsPath);
+    void initFileManager(const std::filesystem::path& projectRoot);
 
     void OnUIRender();
     void OnEntityRemoved(Entity* entity);

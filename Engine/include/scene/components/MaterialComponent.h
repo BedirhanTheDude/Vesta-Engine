@@ -10,29 +10,28 @@ class Archive;
 
 class MaterialComponent : public Component {
 public:
-    MaterialComponent(std::shared_ptr<Material> material = nullptr);
+    explicit MaterialComponent(const Entity& entity) : Component(entity) {}
 
-    MaterialComponent(std::vector<std::shared_ptr<Material>> mats) : materials(std::move(mats)) {}
+    // what addComponent<MaterialComponent>(material) forwards to, nullptr gives a default material
+    void init(std::shared_ptr<Material> material = nullptr);
+    void init(std::vector<std::shared_ptr<Material>> mats);
 
-    size_t getMaterialCount() const { return materials.size(); }
-    
+    size_t getMaterialCount() const;
+
+    // nullptr if index is out of range.
+    // the material is shared, the pointer stays valid as long as it is not replaced.
     Material* getMaterial(int index = 0) const;
 
     void setMaterial(int index, std::shared_ptr<Material> mat);
     void setMaterials(const std::vector<std::shared_ptr<Material>>& materials);
 
-	void serialize(Archive& arch) const override;
-	void deserialize(const Archive& arch) override;
+    void serialize(Archive& arch) const override;
+    void deserialize(const Archive& arch) override;
 
     void addMaterial(std::shared_ptr<Material> mat);
     void addDefaultMaterial();
 
-private:
-    
-    void registerMaterialProperties(unsigned int materialIdx);
-    void registerMaterialPayloads(unsigned int materialIdx);
-    void rebuildMaterialRegistration();
-
-    std::vector<std::shared_ptr<Material>> materials;
-    std::vector<std::vector<Property>> propertyCache;
+    // a component without any material would draw nothing, so it gets a default one
+    bool onAttach();
+    void onDetach() {}
 };

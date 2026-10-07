@@ -1,82 +1,124 @@
 #include "SceneSerializer.h"
 
-#include <fstream>
 #include <filesystem>
+#include <iostream>
+#include <system_error>
 
 #include <glm/gtc/type_ptr.hpp>
 
 #include <scene/Scene.h>
 #include <scene/Entity.h>
+#include <scene/components/TransformComponent.h>
 #include <scene/components/CameraComponent.h>
 #include <scene/components/ComponentFactory.h>
 #include <persistance/Archive.h>
+#include <core/Project.h>
 
-void SceneSerializer::save(const Scene& scene, bool temp) {
-    if (scene.isPlaying) return;
+static bool getSceneFilePath(const Scene& scene, bool temp, std::filesystem::path& outPath) {
+    if (!Project::isOpen()) {
+        std::cerr << "[Error] No project is open\n";
+        return false;
+    }
 
-    static std::string startSceneConfigName = "start.dat";
+    if (temp) {
+        outPath = Project::getCacheDirectory() / (std::string("temp") + Project::sceneExtension);
+        return true;
+    }
 
-    std::string suffix = temp ? "_temp.vrea" : ".vrea";
+    if (!Project::resolve(scene.getScenePath(), outPath)) {
+        std::cerr << "[Error] Scene \"" << scene.getSceneName() << "\" has no valid path inside the project: \""
+            << scene.getScenePath() << "\"\n";
+        return false;
+    }
 
-    std::filesystem::path scenePath = std::filesystem::current_path() /
-        "assets" / "scenes" / (scene.getSceneName() + suffix);
+    return true;
+}
+
+bool SceneSerializer::save(const Scene& scene, bool temp) {
+    if (scene.isPlaying) return false;
+
+    std::filesystem::path scenePath;
+    if (!getSceneFilePath(scene, temp, scenePath)) return false;
 
     Archive arch;
     Archive sceneArch;
 
-    if (scene.getActiveCamera())
-        sceneArch.set("activeCamera", scene.getActiveCamera()->getEntity()->getName());
+    Entity activeCamera = scene.getActiveCameraEntity();
+    if (activeCamera.isValid())
+        sceneArch.set("activeCamera", activeCamera.getName());
 
-    for (const auto& [entityID, entity] : scene.getEntities()) {
+    for (const Entity& entity : scene.getEntities()) {
         Archive ej;
-        entity->serialize(ej);
+        ej.set("name", entity.getName());
+
+        TransformComponent transform = entity.getTransform();
+
+        Entity parent = transform.getParent();
+        ej.set("parent", parent.isAlive() ? parent.getName() : std::string(""));
+
+        // world space, the parent is re-applied (keeping the world transform) once every entity exists
+        Archive transformArch;
+        transformArch.set("position", transform.getWorldPosition());
+        transformArch.set("rotation", transform.getWorldRotationQuat());
+        transformArch.set("scale", transform.getWorldScale());
+        ej.set("transform", std::move(transformArch));
+
+        ComponentFactory::serializeEntity(entity, ej);
+
         sceneArch.append("entities", std::move(ej));
     }
 
     arch.set("scene", std::move(sceneArch));
-    arch.saveToFile(scenePath.string());
 
-    if (!temp) {
-        Archive cfg;
-        cfg.set("last_scene", scene.getSceneName());
-        cfg.saveToFile(startSceneConfigName);
+    std::error_code ec;
+    std::filesystem::create_directories(scenePath.parent_path(), ec);
+
+    if (!arch.saveToFile(scenePath)) {
+        std::cerr << "[Error] Could not write scene file " << scenePath << '\n';
+        return false;
     }
+
+    if (!temp)
+        Project::setStartupScene(scene.getScenePath());
+
+    return true;
 }
 
 bool SceneSerializer::load(Scene& scene, bool temp) {
-    scene.clear();
-    scene.isPlaying = false;
-
-    std::string suffix = temp ? "_temp.vrea" : ".vrea";
-
-    std::filesystem::path scenePath = std::filesystem::current_path() /
-        "assets" / "scenes" / (scene.getSceneName() + suffix);
+    std::filesystem::path scenePath;
+    if (!getSceneFilePath(scene, temp, scenePath)) return false;
 
     Archive arch;
-    if (!arch.loadFromFile(scenePath.string())) return false;
+    if (!arch.loadFromFile(scenePath)) {
+        std::cerr << "[Error] Could not read scene file " << scenePath << '\n';
+        return false;
+    }
+
+    scene.clear();
 
     Archive sceneArch = arch.get("scene");
 
     size_t entityCount = sceneArch.size("entities");
 
-    // Pass 1: create entities, transforms, components
+    // create entities, transforms, components
     for (size_t i = 0; i < entityCount; i++) {
         Archive ej = sceneArch.at("entities", i);
 
         std::string name;
         ej.get("name", name);
-        Entity& entity = scene.createEntityImmediate(name);
+        Entity entity = scene.createEntityImmediate(name);
 
-        Archive transform = ej.get("transform");
+        Archive transformArch = ej.get("transform");
         glm::vec3 pos(0.0f), scl(1.0f);
         glm::quat rot(1.0f, 0.0f, 0.0f, 0.0f);
-        transform.get("position", pos);
-        transform.get("rotation", rot);
-        transform.get("scale", scl);
+        transformArch.get("position", pos);
+        transformArch.get("rotation", rot);
+        transformArch.get("scale", scl);
 
-        entity.getTransform().setPosition(pos);
-        entity.getTransform().setRotation(rot);
-        entity.getTransform().setScale(scl);
+        TransformComponent transform = entity.getTransform();
+        transform.setPosition(pos);
+        transform.setRotation(rot);
+        transform.setScale(scl);
 
         size_t compCount = ej.size("components");
         for (size_t c = 0; c < compCount; c++) {
@@ -87,7 +129,7 @@ bool SceneSerializer::load(Scene& scene, bool temp) {
         }
     }
 
-    // Pass 2: resolve parents
+    // resolve parents
     for (size_t i = 0; i < entityCount; i++) {
         Archive ej = sceneArch.at("entities", i);
 
@@ -96,21 +138,19 @@ bool SceneSerializer::load(Scene& scene, bool temp) {
             std::string childName;
             ej.get("name", childName);
 
-            Entity* child = scene.findEntity(childName);
-            Entity* parent = scene.findEntity(parentName);
+            Entity child = scene.findEntity(childName);
+            Entity parent = scene.findEntity(parentName);
 
-            if (child && parent)
-                child->getTransform().setParent(&parent->getTransform());
+            if (child.isValid() && parent.isValid())
+                child.getTransform().setParent(parent);
         }
     }
 
     std::string camName;
     if (sceneArch.get("activeCamera", camName)) {
-        Entity* camEntity = scene.findEntity(camName);
-        if (camEntity) {
-            auto* cam = camEntity->getComponent<CameraComponent>();
-            if (cam) scene.setActiveCamera(cam);
-        }
+        Entity camEntity = scene.findEntity(camName);
+        if (camEntity.isValid() && camEntity.hasComponent<CameraComponent>())
+            scene.setActiveCamera(camEntity);
     }
 
     return true;

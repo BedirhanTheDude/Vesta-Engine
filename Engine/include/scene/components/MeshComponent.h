@@ -9,16 +9,22 @@ class Archive;
 
 class MeshComponent : public Component {
 public:
-	MeshComponent(std::shared_ptr<Mesh> mesh = nullptr);
+	explicit MeshComponent(const Entity& entity) : Component(entity) {}
+
+	// what addComponent<MeshComponent>(mesh) forwards to
+	void init(std::shared_ptr<Mesh> mesh = nullptr);
 
 	void setMesh(std::shared_ptr<Mesh> mesh);
-	Mesh* getMesh();
-	const Mesh* getMesh() const;
+	// nullptr if there is no mesh. 
+	// The mesh is shared, the pointer stays valid as long as it is not replaced.
+	Mesh* getMesh() const;
+
+	void setPrimitive(unsigned int primitive);
+	unsigned int getPrimitive() const;
 
 	void serialize(Archive& arch) const override;
 	void deserialize(const Archive& arch) override;
-private:
-	std::shared_ptr<Mesh> mesh;
 
-	unsigned int primitive = 0;
+	bool onAttach() { return true; }
+	void onDetach() {}
 };

@@ -12,6 +12,7 @@
 
 #include <core/Application.h>
 #include <core/Input.h>
+#include <core/Project.h>
 
 #include <scene/Scene.h>
 #include <scene/Entity.h>
@@ -34,206 +35,214 @@
 #include <gui/EditorLayer.h>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
+	glViewport(0, 0, width, height);
 }
 
-int main() {
-    if (!glfwInit()) {
-        std::cout << "Failed to initialize GLFW\n";
-        return -1;
-    }
+/*
+// command line argument (a directory is made into a project if it isn't one yet), else the last opened project,
+// else the sample project in the repo
+static bool openProject(int argc, char** argv) {
+	static const char* editorConfigName = "editor.dat";
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	bool opened = false;
+
+	if (argc > 1) {
+		// argv is in the ANSI code page, so this is the narrow (not u8path) constructor
+		std::filesystem::path requested(argv[1]);
+		opened = Project::create(requested, requested.filename().string());
+	}
+	else {
+		Archive editorConfig;
+		std::string lastProject;
+		if (editorConfig.loadFromFile(editorConfigName) && editorConfig.get("last_project", lastProject))
+			opened = Project::open(std::filesystem::u8path(lastProject));
+	}
+
+	if (!opened) return false;
+
+	Archive editorConfig;
+	editorConfig.set("last_project", Project::getRoot().string());
+	editorConfig.saveToFile(editorConfigName);
+
+	return true;
+}*/
+
+int main() {
+	if (!glfwInit()) {
+		std::cout << "Failed to initialize GLFW\n";
+		return -1;
+	}
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow* window = glfwCreateWindow(1000, 800, "Vesta Engine", nullptr, nullptr);
-    if (!window) {
-        std::cout << "Failed to create window.\n";
-        glfwTerminate();
-        return -1;
-    }
+	GLFWwindow* window = glfwCreateWindow(1000, 800, "Vesta Engine", nullptr, nullptr);
+	if (!window) {
+		std::cout << "Failed to create window.\n";
+		glfwTerminate();
+		return -1;
+	}
 
-    int iconW, iconH, iconChannels;
-    unsigned char* iconPixels = stbi_load("icon.png", &iconW, &iconH, &iconChannels, 4);
-    if (iconPixels) {
-        GLFWimage icon = { iconW, iconH, iconPixels };
-        glfwSetWindowIcon(window, 1, &icon);
-        stbi_image_free(iconPixels);
-    }
+	Application::setWindow(window); // store a global pointer to the window
 
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	int iconW, iconH, iconChannels;
+	unsigned char* iconPixels = stbi_load("icon.png", &iconW, &iconH, &iconChannels, 4);
+	if (iconPixels) {
+		GLFWimage icon = { iconW, iconH, iconPixels };
+		glfwSetWindowIcon(window, 1, &icon);
+		stbi_image_free(iconPixels);
+	}
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cout << "Failed to initialize GLAD\n";
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return -1;
-    }
+	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    glViewport(0, 0, 1000, 800);
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		std::cout << "Failed to initialize GLAD\n";
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		return -1;
+	}
 
+	glViewport(0, 0, 1000, 800);
 
-    // TODO: Write an actual polling system for script modification after setting up a 
-    // working project directory system for the Engine, until then leave this commented out
-    /*
-    // compile() emits temp_scripts.dll; replaceOldDLLFile() renames it to scripts.dll
-    // (the reload path does this too, but the initial compile needs it explicitly).
-    if (!std::filesystem::exists("scripts.dll")) {
-        if (ScriptCompiler::compile())
-            ScriptLoader::replaceOldDLLFile();
-    }
-    ScriptCompiler::loadDLL();*/
+	Input::init(window);
 
-    Input::init(window);
+	// Application owns the Scene and Renderer; controllers reach them through Application,
+	// so the editor panels and this loop share one source of truth.
+	// newScene loads the project's startup scene if there is one, otherwise builds the default scene.
+	Scene* scene = Application::newScene(Project::getStartupScene());
+	Renderer* renderer = Application::newRenderer();
 
-    std::string sceneName = "scene";
+	ImGuiLayer imguiLayer;
+	imguiLayer.Init(window);
 
-    Archive cfgArch;
-    if (cfgArch.loadFromFile("start.dat")) {
-        cfgArch.get("last_scene", sceneName);
-    }
+	EditorLayer editorLayer;
 
-    // Application owns the Scene and Renderer; controllers reach them through Application,
-    // so the editor panels and this loop share one source of truth.
-    // newScene loads <name>.vrea if present, otherwise builds the default scene.
-    Scene* scene = Application::newScene(sceneName);
-    Renderer* renderer = Application::newRenderer();
+	auto onExit = []() {
+		glfwSetWindowShouldClose(glfwGetCurrentContext(), true);
+		};
 
-    ImGuiLayer imguiLayer;
-    imguiLayer.Init(window);
+	editorLayer.Init(onExit);
+	editorLayer.initFileManager(Project::getRoot());
 
-    EditorLayer editorLayer;
+	ViewportFramebuffer gameFramebuffer;
+	gameFramebuffer.Init(1000, 800);
 
-    auto onExit = []() {
-        glfwSetWindowShouldClose(glfwGetCurrentContext(), true);
-    };
+	ViewportFramebuffer sceneFramebuffer;
+	sceneFramebuffer.Init(1000, 800);
 
-    editorLayer.Init(onExit);
-    editorLayer.initFileManager(
-        (std::filesystem::current_path() / "assets").string(),
-        (std::filesystem::current_path() / "scripts").string());
+	float last = 0.0f;
 
-    ViewportFramebuffer gameFramebuffer;
-    gameFramebuffer.Init(1000, 800);
+	while (!glfwWindowShouldClose(window)) {
+		float now = static_cast<float>(glfwGetTime());
+		if (last == 0.0f) {
+			last = now;
+		}
 
-    ViewportFramebuffer sceneFramebuffer;
-    sceneFramebuffer.Init(1000, 800);
+		float dt = now - last;
+		last = now;
 
-    scene->onEntityRemoved = [&editorLayer](Entity* entity) {
-        editorLayer.OnEntityRemoved(entity);
-    };
+		glfwPollEvents();
 
-    float last = 0.0f;
+		Input::update();
 
-    while (!glfwWindowShouldClose(window)) {
-        float now = static_cast<float>(glfwGetTime());
-        if (last == 0.0f) {
-            last = now;
-        }
+		if (Input::isKeyDown(Key::LeftControl) && Input::isKeyPressed(Key::S) && !scene->isPlaying) {
+			SceneController::saveScene();
+			printf("Scene saved!\n");
+		}
 
-        float dt = now - last;
-        last = now;
+		if (Input::isKeyDown(Key::LeftControl) && Input::isKeyPressed(Key::O)) {
+			SceneController::loadScene();
+			editorLayer.OnEntityRemoved(nullptr);
+			printf("Scene loaded!\n");
+		}
 
-        glfwPollEvents();
+		if (Input::isKeyDown(Key::LeftControl) &&
+			Input::isKeyDown(Key::LeftShift) &&
+			Input::isKeyPressed(Key::F)) {
 
-        Input::update();
+			Entity camEntity = scene->getActiveCameraEntity();
+			if (camEntity.isValid()) {
+				TransformComponent camTransform = camEntity.getTransform();
+				camTransform.setPosition(editorLayer.editorCamera.position);
+				camTransform.setRotation(editorLayer.editorCamera.rotation);
+			}
+		}
 
-        if (Input::isKeyDown(Key::LeftControl) && Input::isKeyPressed(Key::S) && !scene->isPlaying) {
-            SceneController::saveScene();
-            printf("Scene saved!\n");
-        }
+		bool isDragging = editorLayer.inspectorFocused &&
+			ImGui::IsAnyItemActive() &&
+			ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 
-        if (Input::isKeyDown(Key::LeftControl) && Input::isKeyPressed(Key::O)) {
-            SceneController::loadScene();
-            editorLayer.OnEntityRemoved(nullptr);
-            printf("Scene loaded!\n");
-        }
+		if (isDragging) {
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+		else {
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
 
-        if (Input::isKeyDown(Key::LeftControl) &&
-            Input::isKeyDown(Key::LeftShift) &&
-            Input::isKeyPressed(Key::F)) {
+		//ScriptCompiler::poll(dt, *scene);
 
-            CameraComponent* cam = scene->getActiveCamera();
-            if (cam) {
-                Entity* camEntity = cam->getEntity();
-                camEntity->transform.setPosition(editorLayer.editorCamera.position);
-                camEntity->transform.setRotation(editorLayer.editorCamera.rotation);
-            }
-        }
+		editorLayer.editorCamera.update(dt);
+		scene->onUpdate(dt);
 
-        bool isDragging = editorLayer.inspectorFocused &&
-            ImGui::IsAnyItemActive() &&
-            ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+		// Scene view — editor camera
+		ImVec2 sceneSize = editorLayer.getSceneViewSize();
+		unsigned int sw = static_cast<unsigned int>(sceneSize.x);
+		unsigned int sh = static_cast<unsigned int>(sceneSize.y);
 
-        if (isDragging) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        }
-        else {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        }
+		if (sw > 0 && sh > 0) {
+			sceneFramebuffer.Resize(sw, sh);
+			float aspect = static_cast<float>(sw) / static_cast<float>(sh);
+			sceneFramebuffer.Bind();
+			renderer->render(*scene,
+				editorLayer.editorCamera.getViewMatrix(),
+				editorLayer.editorCamera.getProjectionMatrix(aspect));
+			sceneFramebuffer.Unbind();
+			editorLayer.sceneViewTexture = sceneFramebuffer.GetColorAttachment();
+		}
 
-        //ScriptCompiler::poll(dt, *scene);
+		// Game view — scene camera
+		ImVec2 gameSize = editorLayer.getGameViewSize();
+		unsigned int gw = static_cast<unsigned int>(gameSize.x);
+		unsigned int gh = static_cast<unsigned int>(gameSize.y);
 
-        editorLayer.editorCamera.update(dt);
-        scene->onUpdate(dt);
+		auto gameCamera = scene->getActiveCameraEntity().getComponent<CameraComponent>(); // empty if there is no active camera
 
-        // Scene view — editor camera
-        ImVec2 sceneSize = editorLayer.getSceneViewSize();
-        unsigned int sw = static_cast<unsigned int>(sceneSize.x);
-        unsigned int sh = static_cast<unsigned int>(sceneSize.y);
+		if (gw > 0 && gh > 0 && gameCamera) {
+			gameFramebuffer.Resize(gw, gh);
+			gameCamera->setAspect(static_cast<float>(gw) / static_cast<float>(gh));
+			gameFramebuffer.Bind();
+			renderer->render(*scene);
+			gameFramebuffer.Unbind();
+			editorLayer.gameViewTexture = gameFramebuffer.GetColorAttachment();
+		}
 
-        if (sw > 0 && sh > 0) {
-            sceneFramebuffer.Resize(sw, sh);
-            float aspect = static_cast<float>(sw) / static_cast<float>(sh);
-            sceneFramebuffer.Bind();
-            renderer->render(*scene,
-                editorLayer.editorCamera.getViewMatrix(),
-                editorLayer.editorCamera.getProjectionMatrix(aspect));
-            sceneFramebuffer.Unbind();
-            editorLayer.sceneViewTexture = sceneFramebuffer.GetColorAttachment();
-        }
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // Game view — scene camera
-        ImVec2 gameSize = editorLayer.getGameViewSize();
-        unsigned int gw = static_cast<unsigned int>(gameSize.x);
-        unsigned int gh = static_cast<unsigned int>(gameSize.y);
+		int windowWidth = 0;
+		int windowHeight = 0;
+		glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+		glViewport(0, 0, windowWidth, windowHeight);
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
 
-        if (gw > 0 && gh > 0 && scene->getActiveCamera()) {
-            gameFramebuffer.Resize(gw, gh);
-            scene->getActiveCamera()->aspect = static_cast<float>(gw) / static_cast<float>(gh);
-            gameFramebuffer.Bind();
-            renderer->render(*scene);
-            gameFramebuffer.Unbind();
-            editorLayer.gameViewTexture = gameFramebuffer.GetColorAttachment();
-        }
+		imguiLayer.Begin();
+		ImGuizmo::BeginFrame();
+		editorLayer.OnUIRender();
+		imguiLayer.End();
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glfwSwapBuffers(window);
+	}
 
-        int windowWidth = 0;
-        int windowHeight = 0;
-        glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
-        glViewport(0, 0, windowWidth, windowHeight);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        imguiLayer.Begin();
-        ImGuizmo::BeginFrame();
-        editorLayer.OnUIRender();
-        imguiLayer.End();
-
-        glfwSwapBuffers(window);
-    }
-
-    Application::shutdown();
-    imguiLayer.Shutdown();
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    return 0;
+	Application::shutdown();
+	imguiLayer.Shutdown();
+	glfwDestroyWindow(window);
+	glfwTerminate();
+	return 0;
 }

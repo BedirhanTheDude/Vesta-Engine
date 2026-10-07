@@ -3,18 +3,32 @@
 #include <renderer/Texture.h>
 
 #include <glad/glad.h>
-#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <vector>
+#include <climits>
 
-Texture::Texture(const std::string& name) {
-    std::filesystem::path filepath = std::filesystem::current_path() / "assets" / "models" / name;
+Texture::Texture(const std::filesystem::path& filePath) {
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open texture: " << filePath << std::endl;
+        return;
+    }
+
+    std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    if (bytes.empty() || bytes.size() > static_cast<size_t>(INT_MAX)) {
+        std::cerr << "Failed to read texture: " << filePath << std::endl;
+        return;
+    }
 
     stbi_set_flip_vertically_on_load(true);
     int width, height, channels;
-    unsigned char* data = stbi_load(filepath.string().c_str(), &width, &height, &channels, 0);
+    unsigned char* data = stbi_load_from_memory(bytes.data(), static_cast<int>(bytes.size()),
+        &width, &height, &channels, 0);
 
     if (!data) {
-        std::cerr << "Failed to load texture: " << filepath << std::endl;
+        std::cerr << "Failed to load texture: " << filePath << std::endl;
         return;
     }
 
