@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <mutex>
+#include <cstdint>
 
 class Project {
 public:
@@ -30,6 +31,16 @@ public:
 	// directories that scans skip: the cache directory and any directory starting with '.'
 	static bool isIgnoredDirectory(const std::filesystem::path& directory);
 	static bool isProjectFile(const std::filesystem::path& path);
+
+	static bool copyTransform(uint32_t entityID);
+	static bool copyComponent(uint32_t entityID, uint32_t componentUID);
+	static bool copyEntity(uint32_t entityID);
+
+	static void pasteComponent(uint32_t entityID);
+	static void pasteEntity();
+
+	static bool hasCopiedComponent();
+	static bool hasCopiedEntity();
 
 	static const std::string& getStartupScene();
 	static void setStartupScene(const std::string& relativeScenePath);

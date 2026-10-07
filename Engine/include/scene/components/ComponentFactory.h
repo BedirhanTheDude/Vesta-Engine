@@ -15,6 +15,7 @@ struct ComponentOps {
     bool (*has)(const Entity&);
     void (*remove)(Entity&);
     bool (*serialize)(const Entity&, Archive&); // false if the entity has no such component
+    void (*deserialize)(Entity&, const Archive&);
 };
 
 // gotta make my own syntactic sugar
@@ -25,8 +26,13 @@ struct ComponentOps {
         auto c = e.getComponent<Type>(); \
         if (!c) return false; \
         c->serialize(a); \
-        return true; \
-    } }
+        return true; }, \
+    [](Entity& e, const Archive& a) { \
+        auto c = e.getComponent<Type>(); \
+        if (!c) return; \
+        c->deserialize(a); \
+        } \
+    }
 
 // for registering ONLY built-in components
 // this self-registering lambda gets invoked before main(), how cool is that?
@@ -50,6 +56,7 @@ public:
     static void registerBuiltIn(const std::string& name, Creator creator, ComponentOps ops);
     static void registerScript(const std::string& name, Creator creator, ComponentOps ops);
     static void create(const std::string& name, Entity& entity, const Archive& arch);
+    static void fillExistingComponent(Entity& entity, const Archive& arch);
     static void clearScriptRegistry();
 
     // removes the component with this UID (onDetach included), does nothing if the entity has none
@@ -58,6 +65,7 @@ public:
     // appends every component the entity has to arch's "components" array as { type, ...fields }
     // built-ins first, then scripts, each group in name order so the load order is deterministic
     static void serializeEntity(const Entity& entity, Archive& arch);
+    static void serializeComponent(const Entity& entity, const std::string& componentName, Archive& arch);
 
     // UIDs of the components the entity currently has
     // mainly for the editor to iterate over, no other real use for this

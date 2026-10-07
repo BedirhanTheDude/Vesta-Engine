@@ -14,12 +14,14 @@ namespace ECS {
     class EntityManager;
 }
 
+class Archive;
 class PhysicsWorld;
 class BehaviourComponent;
 
 class Scene {
     friend class Application;
     friend class Entity;
+    friend class Project;
 public:
     ~Scene();
 
@@ -76,6 +78,14 @@ private:
     void renameEntity(const ECS::EntityHandle& handle, const std::string& name);
     bool entityExists(const ECS::EntityHandle& handle) const;
     std::string getEntityName(const ECS::EntityHandle& handle) const;
+
+    bool copyTransform(uint32_t entityId, Archive& outArch) const;
+    bool copyComponent(uint32_t entityId, uint32_t componentUID, Archive& outArch) const;
+    bool copyEntity(uint32_t entityId, Archive& outArch) const;
+
+    void pasteTransform(uint32_t entityId, const Archive& transformArchive);
+    void pasteComponent(uint32_t entityId, const Archive& componentArchive);
+    void pasteEntity(const Archive& entityArcive);
 
     void ensureSparseSize(const ECS::EntityHandle& handle);
 

@@ -1,5 +1,6 @@
 #include <controller/EntityController.h>
 
+#include <core/Project.h>
 #include <scene/Scene.h>
 #include <scene/components/TransformComponent.h>
 
@@ -74,6 +75,18 @@ void EntityController::removeEntity(unsigned int ID) {
 	if (!scene) return;
 
 	scene->removeEntity(ID);
+}
+
+bool EntityController::canPasteEntity() {
+	return Project::hasCopiedEntity();
+}
+
+bool EntityController::copyEntity(unsigned int ID) {
+	return Project::copyEntity(static_cast<uint32_t>(ID));
+}
+
+void EntityController::pasteEntity() {
+	Project::pasteEntity();
 }
 
 Entity EntityController::getSelectedEntity() {

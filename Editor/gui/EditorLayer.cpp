@@ -281,9 +281,14 @@ void EditorLayer::ShowHierarchyPanel() {
 
 void EditorLayer::ShowInspectorPanel() {
     // collapsing header with a right-aligned "X" remove button
-    static auto componentHeader = [](const char* label, bool* removeFlag,
+    static auto componentHeader = [](const char* label, bool* removeFlag, bool* copyFlag,
         ImGuiTreeNodeFlags extraFlags = 0) -> bool {
             bool open = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap | extraFlags);
+
+            if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("Copy Component") && copyFlag) *copyFlag = true;
+                ImGui::EndPopup();
+            }
 
             if (removeFlag) {
                 ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - 20.0f);
@@ -291,8 +296,8 @@ void EditorLayer::ShowInspectorPanel() {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 0.6f));
 
-                std::string btnId = std::string("X##rm") + label;
-                if (ImGui::SmallButton(btnId.c_str())) *removeFlag = true;
+                std::string removeBtnId = std::string("X##rm") + label;
+                if (ImGui::SmallButton(removeBtnId.c_str())) *removeFlag = true;
                 ImGui::PopStyleColor(2);
             }
 
@@ -475,6 +480,24 @@ void EditorLayer::ShowInspectorPanel() {
 
     unsigned int entityID = selectedEntity.getID();
 
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+        !ImGui::IsAnyItemHovered()) {
+        ImGui::OpenPopup("##InsBackgroundCtx");
+    }
+
+    if (ImGui::BeginPopup("##InsBackgroundCtx")) {
+        if (ImGui::MenuItem(
+            "Paste Component",
+            nullptr,
+            false,
+            ComponentController::canPasteComponent())) {
+            ComponentController::pasteComponent(entityID);
+        }
+
+        ImGui::EndPopup();
+    }
+
     std::string entityName = EntityController::getEntityName(entityID);
 
     ImGui::Text("Selected Entity: %s", entityName.c_str());
@@ -491,8 +514,9 @@ void EditorLayer::ShowInspectorPanel() {
     }
     ImGui::Separator();
 
+    bool copyTransform = false;
     // Transform is special-cased: every entity has one, it is not one of the addable/removable components.
-    if (componentHeader("Transform", nullptr)) {
+    if (componentHeader("Transform", nullptr, &copyTransform)) {
         glm::vec3 position = TransformController::getPosition(entityID);
         glm::vec3 rotation = TransformController::getRotation(entityID);
         glm::vec3 scale = TransformController::getScale(entityID);
@@ -507,19 +531,23 @@ void EditorLayer::ShowInspectorPanel() {
             TransformController::setScale(entityID, scale);
     }
 
+    if (copyTransform)
+        ComponentController::copyTransform(entityID); // silly transform doesn't know its UID
+
     // a snapshot: the list is not touched while the component widgets below are drawn
     const std::vector<unsigned int> componentUIDs = ComponentController::getEntityComponentUIDs(entityID);
 
     unsigned int componentToRemove = 0;
-    bool hasComponentToRemove = false;
+    unsigned int componentToCopy = 0;
 
     for (unsigned int UID : componentUIDs) {
         ImGui::PushID(static_cast<int>(UID));
 
         std::string compName = ComponentController::componentUIDToString(UID);
         bool removeComp = false;
+        bool copyComp = false;
 
-        if (componentHeader(compName.c_str(), &removeComp, ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (componentHeader(compName.c_str(), &removeComp, &copyComp, ImGuiTreeNodeFlags_DefaultOpen)) {
             for (const PropertyGroup& group :
                 ComponentController::getComponentPropertyGroups(entityID, UID)) {
                 if (!group.name.empty()) ImGui::TextUnformatted(group.name.c_str());
@@ -543,13 +571,17 @@ void EditorLayer::ShowInspectorPanel() {
             }
         }
 
-        if (removeComp) { componentToRemove = UID; hasComponentToRemove = true; }
+        if (removeComp) { componentToRemove = UID; }
+        if (copyComp) { componentToCopy = UID; }
         ImGui::PopID();
     }
 
     // defer component removal
-    if (hasComponentToRemove)
+    if (componentToRemove)
         ComponentController::removeComponent(entityID, componentToRemove);
+
+    if (componentToCopy)
+        ComponentController::copyComponent(entityID, componentToCopy);
 
     ImGui::Separator();
     if (ImGui::Button("Add Component"))

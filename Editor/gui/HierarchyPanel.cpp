@@ -74,6 +74,12 @@ void HierarchyPanel::drawNode(unsigned int eID) {
             if (ImGui::MenuItem("Unparent"))
                 EntityController::unparentEntity(eID);
         }
+        if (ImGui::MenuItem("Copy Entity"))
+            EntityController::copyEntity(eID);
+        if (ImGui::MenuItem("Duplicate")) {
+            EntityController::copyEntity(eID);
+            EntityController::pasteEntity();
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Delete")) {
             EntityController::removeEntity(eID);
@@ -112,9 +118,23 @@ void HierarchyPanel::show(bool* open) {
         drawNode(eID);
     }
 
-    ImGui::InvisibleButton("##hierarchyBg",
-        ImVec2(ImGui::GetContentRegionAvail().x,
-            std::max(ImGui::GetContentRegionAvail().y, 20.0f)));
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+        !ImGui::IsAnyItemHovered()) {
+        ImGui::OpenPopup("##HBackgroundCtx");
+    }
+
+    if (ImGui::BeginPopup("##HBackgroundCtx")) {
+        if (ImGui::MenuItem(
+            "Paste Entity",
+            nullptr,
+            false,
+            EntityController::canPasteEntity())) {
+            EntityController::pasteEntity();
+        }
+
+        ImGui::EndPopup();
+    }
 
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(DND_ID)) {

@@ -46,7 +46,25 @@ void ComponentFactory::create(const std::string& name, Entity& entity, const Arc
         if (it != scriptRegistry.end())
             it->second.creator(entity, arch);
         else
-            printf("Unknown component type: %s\n", name.c_str());
+            printf("[Error] Unknown component type: %s\n", name.c_str());
+    }
+}
+
+void ComponentFactory::fillExistingComponent(Entity& entity, const Archive& arch) {
+    std::string name;
+    arch.get("type", name);
+
+    auto& builtInRegistry = getBuiltInRegistry();
+    auto it = builtInRegistry.find(name);
+    if (it != builtInRegistry.end())
+        it->second.ops.deserialize(entity, arch);
+    else {
+        auto& scriptRegistry = getScriptRegistry();
+        auto it = scriptRegistry.find(name);
+        if (it != scriptRegistry.end())
+            it->second.ops.deserialize(entity, arch);
+        else
+            printf("[Error] Couldn't paste unknown component type: %s\n", name.c_str());
     }
 }
 
@@ -85,6 +103,24 @@ void ComponentFactory::serializeEntity(const Entity& entity, Archive& arch) {
 
     serializeGroup(getBuiltInRegistry());
     serializeGroup(getScriptRegistry());
+}
+
+void ComponentFactory::serializeComponent(const Entity& entity, const std::string& componentName, Archive& arch) {
+    auto trySerialize = [&](const std::map<std::string, Entry>& registry) -> bool {
+        for (const auto& [name, entry] : registry) {
+            if (name != componentName) continue;
+
+            if (entry.ops.serialize(entity, arch)) {
+                arch.set("type", name);
+                return true;
+            }
+        }
+
+        return false;
+        };
+
+    if (!trySerialize(getBuiltInRegistry())) // try to find component in built-in registry first
+        trySerialize(getScriptRegistry()); // then try the srcipts
 }
 
 std::vector<unsigned int> ComponentFactory::getEntityComponentUIDs(const Entity& entity) {

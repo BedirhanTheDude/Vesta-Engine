@@ -8,6 +8,7 @@
 #include <scene/components/BehaviourComponent.h>
 #include <scene/components/RigidBodyComponent.h>
 #include <scene/components/TransformComponent.h>
+#include <scene/components/ComponentFactory.h>
 
 #include <scene/components/Transform.h>
 #include <scene/components/MeshData.h>
@@ -221,6 +222,137 @@ void Scene::removeEntity(unsigned int entityId) {
 	if (!tryGetEntityIndex(handle, denseIndex)) return; // alive in EntityManager but not yet flushed from entitiesToAdd, or genuinely gone
 
 	removeEntity(entities[denseIndex].getHandle());
+}
+
+bool Scene::copyTransform(uint32_t entityId, Archive& outArch) const {
+	uint32_t generation = entityManager->getGeneration(entityId);
+	ECS::EntityHandle handle{ entityId, generation };
+	if (handle.isInvalid()) return false;
+
+	outArch = Archive();
+
+	Transform* transform = componentRegistry->getTransforms().get(handle);
+
+	outArch.set("position", transform->position);
+	outArch.set("rotation", transform->rotation);
+	outArch.set("scale", transform->scale);
+	return true; // If there is an entity there is a transform
+}
+
+bool Scene::copyComponent(uint32_t entityId, uint32_t componentUID, Archive& outArch) const {
+	uint32_t generation = entityManager->getGeneration(entityId);
+	ECS::EntityHandle handle{ entityId, generation };
+	if (handle.isInvalid()) return false;
+
+	outArch = Archive();
+
+	// Guaranteed that scene isn't modified through this entity instance
+	Entity entity(const_cast<Scene*>(this), handle); // Flyweight entity
+	std::string componentName = componentTypeUIDToString(componentUID);
+	ComponentFactory::serializeComponent(entity, componentName, outArch);
+	return outArch.has("type");
+}
+
+bool Scene::copyEntity(uint32_t entityId, Archive& outArch) const {
+	uint32_t generation = entityManager->getGeneration(entityId);
+	ECS::EntityHandle handle{ entityId, generation };
+	if (handle.isInvalid()) return false;
+
+	outArch = Archive();
+
+	Entity entity(const_cast<Scene*>(this), handle);
+
+	outArch.set("name", entity.getName());
+
+	TransformComponent transform = entity.getTransform();
+
+	outArch.set("parent", std::string(""));
+
+	// world space, the parent is re-applied (keeping the world transform) once every entity exists
+	Archive transformArch;
+	transformArch.set("position", transform.getWorldPosition());
+	transformArch.set("rotation", transform.getWorldRotationQuat());
+	transformArch.set("scale", transform.getWorldScale());
+	outArch.set("transform", std::move(transformArch));
+
+	ComponentFactory::serializeEntity(entity, outArch);
+	return outArch.has("components");
+}
+
+void Scene::pasteTransform(uint32_t entityId, const Archive& transformArchive) {
+	if (!transformArchive.has("position")) return;
+
+	uint32_t generation = entityManager->getGeneration(entityId);
+	ECS::EntityHandle handle{ entityId, generation };
+	if (handle.isInvalid()) return;
+
+	Transform* transform = componentRegistry->getTransforms().get(handle);
+
+	glm::vec3 pos(0.0f), scl(1.0f);
+	glm::quat rot(1.0f, 0.0f, 0.0f, 0.0f);
+	transformArchive.get("position", pos);
+	transformArchive.get("rotation", rot);
+	transformArchive.get("scale", scl);
+
+	// Has to go through this for cache invalidation
+	TransformSystem::setPosition(*transform, pos, this);
+	TransformSystem::setRotation(*transform, rot, this);
+	TransformSystem::setScale(*transform, scl, this);
+}
+
+void Scene::pasteComponent(uint32_t entityId, const Archive& componentArchive) {
+	std::string typeName;
+	componentArchive.get("type", typeName);
+	if (typeName.empty()) return;
+
+	uint32_t generation = entityManager->getGeneration(entityId);
+	ECS::EntityHandle handle{ entityId, generation };
+	if (handle.isInvalid()) return;
+
+	Entity entity(const_cast<Scene*>(this), handle);
+
+	uint32_t componentUID = componentNameToUID(typeName);
+	auto* pool = componentRegistry->getPool(componentUID);
+	
+	bool hasComponent = pool->has(handle);
+	
+	if (hasComponent)
+		ComponentFactory::fillExistingComponent(entity, componentArchive);
+	else
+		ComponentFactory::create(typeName, entity, componentArchive);
+}
+
+void Scene::pasteEntity(const Archive& entityArchive) {
+	std::string name;
+	entityArchive.get("name", name);
+	if (name.empty()) return;
+
+	// has to acquire scene lock because this has to deserialize the entity on spot
+	// so it calls createEntityImmediate
+	std::mutex& sceneMutex = Project::getSceneMutex();
+	std::lock_guard<std::mutex> lock(sceneMutex);
+
+	Entity entity = createEntityImmediate(name);
+
+	Archive transformArch = entityArchive.get("transform");
+	glm::vec3 pos(0.0f), scl(1.0f);
+	glm::quat rot(1.0f, 0.0f, 0.0f, 0.0f);
+	transformArch.get("position", pos);
+	transformArch.get("rotation", rot);
+	transformArch.get("scale", scl);
+
+	TransformComponent transform = entity.getTransform();
+	transform.setPosition(pos);
+	transform.setRotation(rot);
+	transform.setScale(scl);
+
+	size_t compCount = entityArchive.size("components");
+	for (size_t c = 0; c < compCount; c++) {
+		Archive cj = entityArchive.at("components", c);
+		std::string type;
+		cj.get("type", type);
+		ComponentFactory::create(type, entity, cj);
+	}
 }
 
 void Scene::renameEntity(const ECS::EntityHandle& handle, const std::string& name) {

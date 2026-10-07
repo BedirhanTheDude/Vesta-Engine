@@ -2,6 +2,7 @@
 
 #include <controller/EntityController.h>
 
+#include <core/Project.h>
 #include <scene/Entity.h>
 #include <scene/components/Component.h>
 #include <scene/components/BehaviourComponent.h>
@@ -82,6 +83,22 @@ bool ComponentController::entityHasComponent(unsigned int entityID, const std::s
 	if (!entity.isValid()) return false;
 
 	return entity.hasComponent(componentNameToUID(componentName));
+}
+
+bool ComponentController::canPasteComponent() {
+	return Project::hasCopiedComponent();
+}
+
+bool ComponentController::copyTransform(unsigned int entityID) {
+	return Project::copyTransform(entityID);
+}
+
+bool ComponentController::copyComponent(unsigned int entityID, unsigned int componentUID) {
+	return Project::copyComponent(static_cast<uint32_t>(entityID), static_cast<uint32_t>(componentUID));
+}
+
+void ComponentController::pasteComponent(unsigned int entityID) {
+	Project::pasteComponent(static_cast<uint32_t>(entityID));
 }
 
 const std::vector<std::string>& ComponentController::getAvailableComponentNames() {

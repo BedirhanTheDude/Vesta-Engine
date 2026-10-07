@@ -18,6 +18,10 @@ namespace EntityController {
 	void renameEntity(unsigned int ID, const char* name);
 	void removeEntity(unsigned int ID);
 
+	bool canPasteEntity();
+	bool copyEntity(unsigned int ID);
+	void pasteEntity();
+
 	Entity getSelectedEntity();
 	// selecting a dead or invalid entity clears the selection
 	void setSelectedEntity(const Entity& entity);

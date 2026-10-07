@@ -1,13 +1,18 @@
 #include <core/Project.h>
 
+#include <core/Application.h>
 #include <persistance/Archive.h>
+
+#include <scene/Scene.h>
 
 #include <scripting/ScriptCompiler.h>
 #include <scripting/ScriptLoader.h>
 
-#include <iostream>
 #include <system_error>
 #include <filesystem>
+#include <iostream>
+#include <cstdint>
+#include <utility>
 #include <string>
 #include <mutex>
 
@@ -20,6 +25,13 @@ std::string Project::name;
 std::string Project::startupScene;
 std::mutex Project::sceneMutex;
 bool Project::projectOpen = false;
+
+// These are here because Project doesn't need to know about Archive
+static Archive copyComponentCache;
+static Archive copyEntityCache;
+static bool copiedTransform = false;
+static bool copiedComponent = false;
+static bool copiedEntity = false;
 
 static bool tryGetProjectArchivePath(const std::filesystem::path rootPath, std::filesystem::path& outPath) {
 	auto options = std::filesystem::directory_options::skip_permission_denied;
@@ -113,6 +125,11 @@ bool Project::open(const fs::path& rootPath) {
 	startupScene = std::move(scene);
 	projectOpen = true;
 
+	copyComponentCache = Archive();
+	copyEntityCache = Archive();
+	copiedComponent = false;
+	copiedEntity = false;
+
 	bool compiledScripts = ScriptCompiler::compile();
 	if (compiledScripts) {
 		ScriptLoader::replaceOldDLLFile();
@@ -159,6 +176,54 @@ bool Project::isIgnoredDirectory(const fs::path& directory) {
 
 bool Project::isProjectFile(const fs::path& path) {
 	return path == projectArchivePath;
+}
+
+bool Project::copyTransform(uint32_t entityID) {
+	Scene* scene = Application::getCurrentScene();
+	if (scene->copyTransform(entityID, copyComponentCache)) {
+		copiedTransform = true;
+		return copiedComponent = true;
+	}
+	return false;
+}
+
+bool Project::copyComponent(uint32_t entityID, uint32_t componentUID) {
+	Scene* scene = Application::getCurrentScene();
+	if (scene->copyComponent(entityID, componentUID, copyComponentCache)) {
+		copiedTransform = false;
+		return copiedComponent = true;
+	}
+	return false;
+}
+
+bool Project::copyEntity(uint32_t entityID) {
+	Scene* scene = Application::getCurrentScene();
+	if (scene->copyEntity(entityID, copyEntityCache)) {
+		return copiedEntity = true;
+	}
+	return false;
+}
+
+void Project::pasteComponent(uint32_t entityID) {
+	Scene* scene = Application::getCurrentScene();
+	
+	if (copiedTransform)
+		scene->pasteTransform(entityID, copyComponentCache);
+	else
+		scene->pasteComponent(entityID, copyComponentCache);
+}
+
+void Project::pasteEntity() {
+	Scene* scene = Application::getCurrentScene();
+	scene->pasteEntity(copyEntityCache);
+}
+
+bool Project::hasCopiedComponent() {
+	return copiedComponent;
+}
+
+bool Project::hasCopiedEntity() {
+	return copiedEntity;
 }
 
 void Project::setStartupScene(const std::string& relativeScenePath) {
