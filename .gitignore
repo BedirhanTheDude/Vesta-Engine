@@ -44,10 +44,7 @@ _deps/
 *.so
 *.dylib
 
-dependencies/compiler/*.exe
-dependencies/compiler/*.dll
-
-external
+!dependencies/llvm/
 
 # project cache (script build, mesh caches, temp scene)
 .vesta/
