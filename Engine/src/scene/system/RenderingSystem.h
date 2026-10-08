@@ -47,13 +47,18 @@ namespace RenderingSystem {
 		glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
 	};
 
+	struct Renderable {
+		uint32_t entityId;
+		glm::mat4 model;
+		MeshData mesh;
+		MaterialData material;
+	};
+
 	struct SceneRenderView {
-		std::vector<glm::mat4> models;
-		std::vector<MeshData> meshData;
-		std::vector<MaterialData> materialData;
+		std::vector<Renderable> renderables;
 		std::vector<PointLightData> pointLightData;
 
-		uint32_t entityCount = 0;
+		uint32_t renderableCount = 0;
 
 		DirectionalLightData dirLightData;
 		ShadowData shadowData;
@@ -61,12 +66,10 @@ namespace RenderingSystem {
 		bool isRenderable = false;
 
 		void reset() {
-			models.clear();
-			meshData.clear();
-			materialData.clear();
+			renderables.clear();
 			pointLightData.clear();
 
-			entityCount = 0;
+			renderableCount = 0;
 
 			dirLightData.hasDirLight = false; // essentially invalidates all data inside
 			// shadow data unused if no dir light present

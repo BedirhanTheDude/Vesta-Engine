@@ -55,11 +55,10 @@ namespace RenderingSystem {
 
 			glm::mat4 model = TransformSystem::getMatrix(*transforms.get(entity), mutableScene);
 
-			renderView.models.push_back(model);
-			renderView.meshData.push_back(mesh);
-			renderView.materialData.push_back(*material);
+			Renderable renderable{ entity.entityId, model, mesh, *material };
+			renderView.renderables.push_back(std::move(renderable));
 
-			++renderView.entityCount;
+			++renderView.renderableCount;
 		}
 
 		// build point light buffer

@@ -66,9 +66,9 @@ struct FrameData {
 
 struct TransparentDraw {
 	float distance;
+	const glm::mat4* model;
 	const MeshData* mesh;
 	const MaterialData* materials;
-	const glm::mat4* model;
 };
 
 static const int SHADOW_TEXTURE_UNIT = 4;
@@ -200,8 +200,8 @@ void Renderer::render(const RenderingSystem::SceneRenderView* renderView,
 		depthShader->use();
 		depthShader->setMat4("uLightSpaceMatrix", shadow.lightSpaceMatrix);
 
-		for (uint32_t i = 0; i < renderView->entityCount; ++i) {
-			drawEntityDepth(renderView->models.at(i), renderView->meshData.at(i));
+		for (const RenderingSystem::Renderable& renderable : renderView->renderables) {
+			drawEntityDepth(renderable.model, renderable.mesh);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
@@ -233,16 +233,13 @@ void Renderer::render(const RenderingSystem::SceneRenderView* renderView,
 	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
 	glActiveTexture(GL_TEXTURE0);
 
-	for (uint32_t i = 0; i < renderView->entityCount; ++i) {
-		const MeshData& meshData = renderView->meshData.at(i);
-		const MaterialData& materialData = renderView->materialData.at(i);
-		const glm::mat4& modelMatrix = renderView->models.at(i);
+	for (const RenderingSystem::Renderable renderable : renderView->renderables) {
 
-		drawEntity(modelMatrix, meshData, materialData, frame, false);
+		drawEntity(renderable.model, renderable.mesh, renderable.material, frame, false);
 
-		if (hasAnyTransparent(materialData)) {
-			glm::vec3 worldPosition = modelMatrix[3];
-			transparentDraws.push_back({ glm::length(worldPosition - camPos), &meshData, &materialData, &modelMatrix });
+		if (hasAnyTransparent(renderable.material)) {
+			glm::vec3 worldPosition = renderable.model[3];
+			transparentDraws.push_back({ glm::length(worldPosition - camPos), &renderable.model, &renderable.mesh, &renderable.material });
 		}
 	}
 
