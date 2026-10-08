@@ -1,8 +1,7 @@
 #include "EditorLayer.h"
 
-#include "imgui.h"
-
-#include "ImGuizmo.h"
+#include <imgui/imgui.h>
+#include <imguizmo/src/ImGuizmo.h>
 
 #include <core/Input.h>
 

@@ -5,6 +5,7 @@
 
 #include <scene/components/Component.h>
 
+#include <cstddef>
 #include <vector>
 
 class TransformComponent : public Component {
@@ -55,5 +56,9 @@ public:
 
 	// The invalid Entity() if there is no parent. A parent that was removed reports isAlive() == false.
 	Entity getParent() const;
+
+	std::size_t getChildCount() const;
+	Entity getChild(std::size_t index) const;
+
 	std::vector<Entity> getChildren() const;
 };

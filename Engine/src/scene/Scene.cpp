@@ -313,7 +313,11 @@ void Scene::pasteComponent(uint32_t entityId, const Archive& componentArchive) {
 
 	uint32_t componentUID = componentNameToUID(typeName);
 	auto* pool = componentRegistry->getPool(componentUID);
-	
+	if (!pool) // component wasn't built-in
+		pool = componentRegistry->getBehaviourPool(componentUID);
+
+	if (!pool) return;
+
 	bool hasComponent = pool->has(handle);
 	
 	if (hasComponent)

@@ -7,8 +7,8 @@
 #include <iostream>
 #include <filesystem>
 
-#include <imgui.h>
-#include <ImGuizmo.h>
+#include <imgui/imgui.h>
+#include <imguizmo/src/ImGuizmo.h>
 
 #include <core/Application.h>
 #include <core/Input.h>
@@ -99,7 +99,7 @@ int main() {
 	}
 
 	glfwMakeContextCurrent(window);
-	glfwSwapInterval(1);
+	glfwSwapInterval(0);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {

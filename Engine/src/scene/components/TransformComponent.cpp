@@ -186,6 +186,29 @@ Entity TransformComponent::getParent() const
     return Entity(sceneOf(entity), parentHandle);
 }
 
+std::size_t TransformComponent::getChildCount() const
+{
+    Transform* transform = resolveComponent<Transform>(entity);
+    if (!transform)
+        return 0;
+
+    return TransformSystem::getChildren(*transform).size();
+}
+
+Entity TransformComponent::getChild(std::size_t index) const
+{
+    Transform* transform = resolveComponent<Transform>(entity);
+    if (!transform)
+        return Entity();
+
+    const auto& children = TransformSystem::getChildren(*transform);
+
+    if (index >= children.size())
+        return Entity();
+
+    return Entity(sceneOf(entity), children[index]);
+}
+
 std::vector<Entity> TransformComponent::getChildren() const
 {
     std::vector<Entity> children;

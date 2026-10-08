@@ -1,7 +1,7 @@
 #include "ObjLoader.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include <tinyobjloader/tiny_object_loader.h>
+#include <tinyobjloader/tiny_obj_loader.h>
 
 #pragma warning(pop)
 
