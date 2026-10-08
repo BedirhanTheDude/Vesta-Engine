@@ -3,7 +3,7 @@ project(GameEngine LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(PHYSX_DIR ${CMAKE_SOURCE_DIR}/external/physx)
+set(PHYSX_DIR ${CMAKE_SOURCE_DIR}/dependencies/physx)
 set(PHYSX_LIB_DIR ${PHYSX_DIR}/$<IF:$<CONFIG:Debug>,debug,release>)
 
 set(BUILD_SHARED_LIBS ON)
@@ -128,7 +128,7 @@ set(IMGUI_SRC
     external/imgui/imgui_demo.cpp
     external/imgui/backends/imgui_impl_glfw.cpp
     external/imgui/backends/imgui_impl_opengl3.cpp
-    external/imguizmo/ImGuizmo.cpp
+    external/imguizmo/src/ImGuizmo.cpp
 )
 
 # Engine.dll (whole engine in a single .dll)
@@ -151,8 +151,8 @@ set_target_properties(Engine PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 target_include_directories(Engine PRIVATE
     ${PHYSX_DIR}/include
-    external/nlohmann
 )
+
 target_include_directories(Engine PUBLIC
     Engine/include
     Engine/src
@@ -233,8 +233,8 @@ endforeach()
 add_custom_command(TARGET Sandbox POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:glfw> $<TARGET_FILE_DIR:Sandbox>)
 
-set(CLANG_CL ${CMAKE_SOURCE_DIR}/dependencies/compiler/clang-cl.exe)
-set(LLDLINK  ${CMAKE_SOURCE_DIR}/dependencies/compiler/lld-link.exe)
+set(CLANG_CL ${CMAKE_SOURCE_DIR}/dependencies/llvm/bin/clang-cl.exe)
+set(LLDLINK  ${CMAKE_SOURCE_DIR}/dependencies/llvm/bin/lld-link.exe)
 if(EXISTS ${CLANG_CL})
     message(STATUS "Found clang-cl: ${CLANG_CL}")
 else()
