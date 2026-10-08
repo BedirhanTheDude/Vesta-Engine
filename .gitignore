@@ -47,8 +47,6 @@ _deps/
 dependencies/compiler/*.exe
 dependencies/compiler/*.dll
 
-external
-
 # project cache (script build, mesh caches, temp scene)
 .vesta/
 
