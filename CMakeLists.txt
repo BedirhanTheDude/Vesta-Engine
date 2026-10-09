@@ -51,6 +51,7 @@ set(SCENE_SYSTEM_SRC
     Engine/src/scene/system/PointLightSystem.cpp
     Engine/src/scene/system/RigidBodySystem.cpp
     Engine/src/scene/system/RenderingSystem.cpp
+    Engine/src/scene/system/ScriptSystem.cpp
     Engine/src/scene/system/TransformSystem.cpp
 )
 
@@ -90,6 +91,7 @@ set(PERSISTANCE_SRC
 )
 
 set(SCRIPTING_SRC
+    Engine/src/scripting/ScriptCache.cpp
     Engine/src/scripting/ScriptCompiler.cpp
     Engine/src/scripting/ScriptLoader.cpp
 )

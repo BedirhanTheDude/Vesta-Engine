@@ -5,10 +5,12 @@
 
 #include "ScriptCompiler.h"
 #include "ScriptLoader.h"
+#include "ScriptCache.h"
 
 #include <scene/components/ComponentFactory.h>
-#include <persistance/SceneSerializer.h> // !!!
-#include <scene/Scene.h> // remove this tight coupling as soon as possible
+#include <scene/Scene.h>
+
+#include <scene/system/ScriptSystem.h>
 
 #include <core/Project.h>
 
@@ -88,20 +90,17 @@ void ScriptCompiler::unloadDLL(HMODULE handle) {
 
 HMODULE ScriptCompiler::getCurrentDLLHandle() { return currentDLLHandle; }
 
+// NOTE: Cannot run concurrently with Scene update
 HMODULE ScriptCompiler::reloadScripts(Scene& scene) {
-	if (!ScriptCompiler::compile()) return currentDLLHandle;
-
-	SceneSerializer::save(scene, true); // save to temp
-	scene.clear();
-
+	ScriptCache::saveScriptState(scene);
+	ScriptSystem::clearScripts(scene);
 	ComponentFactory::clearScriptRegistry();
 
 	ScriptCompiler::unloadDLL(ScriptCompiler::getCurrentDLLHandle());
 	ScriptLoader::replaceOldDLLFile(); // on failure the old DLL is still there and gets loaded again
 
 	ScriptCompiler::loadDLL(); // static lambdas reinitialize the script registry
-
-	SceneSerializer::load(scene, true);
+	ScriptCache::loadScriptState(scene);
 
 	return currentDLLHandle;
 }

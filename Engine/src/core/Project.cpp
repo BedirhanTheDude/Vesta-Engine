@@ -125,8 +125,8 @@ bool Project::open(const fs::path& rootPath) {
 	startupScene = std::move(scene);
 	projectOpen = true;
 
-	copyComponentCache = Archive();
-	copyEntityCache = Archive();
+	copyComponentCache.reset();
+	copyEntityCache.reset();
 	copiedComponent = false;
 	copiedEntity = false;
 

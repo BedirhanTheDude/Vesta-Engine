@@ -3,6 +3,8 @@
 #include <controller/SceneController.h>
 
 #include <core/Project.h>
+#include <core/Application.h>
+#include <scene/components/ComponentFactory.h>
 #include <scripting/ScriptCompiler.h>
 #include <scripting/ScriptLoader.h>
 
@@ -11,25 +13,21 @@
 
 namespace ScriptingController {
 
-	static void compileTask(bool* outCompiled) {
-		std::mutex& sceneMutex = Project::getSceneMutex();
-
-		// lock the Scene so it doesn't try to access unloaded Scripts
-		std::lock_guard<std::mutex> lock(sceneMutex);
-
+	static void compileTask() {
 		bool compiled = ScriptCompiler::compile();
 		if (compiled) {
-			ScriptCompiler::unloadDLL(ScriptCompiler::getCurrentDLLHandle());
-			ScriptLoader::replaceOldDLLFile();
-			ScriptCompiler::loadDLL();
-		}
+			std::mutex& sceneMutex = Project::getSceneMutex();
 
-		if (outCompiled) *outCompiled = compiled;
+			// lock the Scene so it doesn't try to access unloaded Scripts
+			std::lock_guard<std::mutex> lock(sceneMutex);
+
+			ScriptCompiler::reloadScripts(*Application::getCurrentScene());
+		}
 	}
 
 	// NOTE: Script compiler is currently blocking
-	void compileScripts(bool* outCompiled) {
-		std::thread compileThread(compileTask, outCompiled);
+	void compileScripts() {
+		std::thread compileThread(compileTask);
 
 		compileThread.detach();
 	}

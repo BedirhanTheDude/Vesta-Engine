@@ -349,6 +349,11 @@ bool Archive::loadFromFile(const std::filesystem::path& path) {
     return parseFromBuffer(bytes);
 }
 
+void Archive::reset() {
+    impl_->root = std::make_shared<Node>();
+    impl_->root->tag = Tag::Object;
+}
+
 // write scalars
 void Archive::set(const std::string& k, int v) { impl_->put(k, makeScalar(Tag::Int, v)); }
 void Archive::set(const std::string& k, unsigned int v) { impl_->put(k, makeScalar(Tag::UInt, v)); }

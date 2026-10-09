@@ -3,6 +3,6 @@
 #include <string>
 
 namespace ScriptingController {
-	void compileScripts(bool* outCompiled = nullptr);
+	void compileScripts();
 	bool createNewScript(const std::string& scriptName, const std::string& path);
 }

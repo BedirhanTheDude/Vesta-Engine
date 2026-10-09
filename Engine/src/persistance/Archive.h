@@ -38,6 +38,8 @@ public:
     bool serializeToBuffer(std::string& outBytes) const;
     bool parseFromBuffer(const std::string& bytes);
 
+    void reset();
+
     // write scalars
     void set(const std::string& key, int v);
     void set(const std::string& key, unsigned v);

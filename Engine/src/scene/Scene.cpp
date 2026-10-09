@@ -345,10 +345,10 @@ void Scene::pasteEntity(const Archive& entityArchive) {
 	transformArch.get("rotation", rot);
 	transformArch.get("scale", scl);
 
-	TransformComponent transform = entity.getTransform();
-	transform.setPosition(pos);
-	transform.setRotation(rot);
-	transform.setScale(scl);
+	Transform* transform = componentRegistry->getTransforms().get(entity.getHandle());
+	TransformSystem::setPosition(*transform, pos, this);
+	TransformSystem::setRotation(*transform, rot, this);
+	TransformSystem::setScale(*transform, scl, this);
 
 	size_t compCount = entityArchive.size("components");
 	for (size_t c = 0; c < compCount; c++) {
