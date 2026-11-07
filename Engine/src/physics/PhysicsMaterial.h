@@ -25,5 +25,5 @@ public:
 	float restitution;
 
 private:
-	physx::PxMaterial* pxMat = nullptr;
+	physx::PxMaterial* m_PxMat = nullptr;
 };

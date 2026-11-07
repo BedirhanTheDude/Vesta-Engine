@@ -18,13 +18,16 @@ class Archive;
 */
 #define END_SCRIPT(ScriptName) \
     }; \
-    inline bool _autoReg_##ScriptName = []() { \
-        ComponentTypeInfo<ScriptName>::name = #ScriptName; \
-        unsigned int UID = componentTypeUID<ScriptName>(); \
-        __componentTypeUIDToString(UID, true, #ScriptName); \
-        ComponentFactory::registerScript(#ScriptName, [](Entity& e, const Archive& arch) { \
-            auto& c = e.addComponent<ScriptName>(); \
-            c.deserialize(arch); \
-        }, COMPONENT_OPS(ScriptName)); \
-        return true; \
-    }();
+    namespace { \
+        inline bool _autoReg_##ScriptName = []() { \
+            ComponentTypeInfo<ScriptName>::name = #ScriptName; \
+            unsigned int UID = componentTypeUID<ScriptName>(); \
+            __componentTypeUIDToString(UID, true, #ScriptName); \
+            ComponentFactory::registerScript(#ScriptName, [](Entity& e, const Archive& arch) { \
+                auto& c = e.addComponent<ScriptName>(); \
+                c.deserialize(arch); \
+            }, COMPONENT_OPS(ScriptName)); \
+            return true; \
+        }(); \
+    }
+    

@@ -29,18 +29,18 @@ public:
     void serialize(Archive& arch) const override;
     void deserialize(const Archive& arch) override;
 
-    unsigned int getTypeUID() const { return typeUID; }
+    unsigned int getTypeUID() const { return m_TypeUID; }
 
 private:
     void tick(float dt) {
-        if (!started) {
+        if (!m_Started) {
             onStart();
-            started = true;
+            m_Started = true;
         }
         onUpdate(dt);
     }
 
-    bool started = false;
+    bool m_Started = false;
 
-    unsigned int typeUID = 0; // set by Scene when the behaviour is attached to an entity
+    unsigned int m_TypeUID = 0; // set by Scene when the behaviour is attached to an entity
 };

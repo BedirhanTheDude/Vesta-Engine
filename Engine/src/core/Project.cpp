@@ -18,13 +18,13 @@
 
 namespace fs = std::filesystem;
 
-fs::path Project::root;
-fs::path Project::cacheDirectory;
-fs::path Project::projectArchivePath;
-std::string Project::name;
-std::string Project::startupScene;
-std::mutex Project::sceneMutex;
-bool Project::projectOpen = false;
+fs::path Project::m_Root;
+fs::path Project::m_CacheDirectory;
+fs::path Project::m_ProjectArchivePath;
+std::string Project::m_Name;
+std::string Project::m_StartupScene;
+std::mutex Project::m_SceneMutex;
+bool Project::m_ProjectOpen = false;
 
 // These are here because Project doesn't need to know about Archive
 static Archive copyComponentCache;
@@ -58,11 +58,11 @@ static bool tryGetProjectArchivePath(const std::filesystem::path rootPath, std::
 	return false;
 }
 
-bool Project::isOpen() { return projectOpen; }
-const fs::path& Project::getRoot() { return root; }
-const fs::path& Project::getCacheDirectory() { return cacheDirectory; }
-const std::string& Project::getName() { return name; }
-const std::string& Project::getStartupScene() { return startupScene; }
+bool Project::isOpen() { return m_ProjectOpen; }
+const fs::path& Project::getRoot() { return m_Root; }
+const fs::path& Project::getCacheDirectory() { return m_CacheDirectory; }
+const std::string& Project::getName() { return m_Name; }
+const std::string& Project::getStartupScene() { return m_StartupScene; }
 
 bool Project::create(const fs::path& rootPath, const std::string& projectName) {
 	std::error_code ec;
@@ -79,14 +79,14 @@ bool Project::create(const fs::path& rootPath, const std::string& projectName) {
 		return false;
 	}
 
-	projectArchivePath = cache / (projectName + projectFileExtension);
-	if (!fs::exists(projectArchivePath, ec)) {
+	m_ProjectArchivePath = cache / (projectName + projectFileExtension);
+	if (!fs::exists(m_ProjectArchivePath, ec)) {
 		Archive arch;
 		arch.set("name", projectName);
 		arch.set("startupScene", std::string());
 
-		if (!arch.saveToFile(projectArchivePath)) {
-			std::cerr << "[Error] Could not write " << projectArchivePath.filename() << " in " << rootPath << '\n';
+		if (!arch.saveToFile(m_ProjectArchivePath)) {
+			std::cerr << "[Error] Could not write " << m_ProjectArchivePath.filename() << " in " << rootPath << '\n';
 			return false;
 		}
 	}
@@ -104,12 +104,12 @@ bool Project::open(const fs::path& rootPath) {
 		return false;
 	}
 
-	bool archiveFound = tryGetProjectArchivePath(absolute, projectArchivePath);
+	bool archiveFound = tryGetProjectArchivePath(absolute, m_ProjectArchivePath);
 
 	if (!archiveFound) return false;
 
 	Archive arch;
-	if (!arch.loadFromFile(projectArchivePath)) {
+	if (!arch.loadFromFile(m_ProjectArchivePath)) {
 		std::cerr << "[Error] No readable " << projectFileExtension << " in " << absolute << '\n';
 		return false;
 	}
@@ -119,11 +119,11 @@ bool Project::open(const fs::path& rootPath) {
 	arch.get("name", projectName);
 	arch.get("startupScene", scene);
 
-	root = std::move(absolute);
-	cacheDirectory = root / cacheDirectoryName;
-	name = std::move(projectName);
-	startupScene = std::move(scene);
-	projectOpen = true;
+	m_Root = std::move(absolute);
+	m_CacheDirectory = m_Root / cacheDirectoryName;
+	m_Name = std::move(projectName);
+	m_StartupScene = std::move(scene);
+	m_ProjectOpen = true;
 
 	copyComponentCache.reset();
 	copyEntityCache.reset();
@@ -140,7 +140,7 @@ bool Project::open(const fs::path& rootPath) {
 }
 
 bool Project::resolve(const std::string& relativePath, fs::path& outPath) {
-	if (!projectOpen || relativePath.empty()) return false;
+	if (!m_ProjectOpen || relativePath.empty()) return false;
 
 	fs::path relative = fs::u8path(relativePath).lexically_normal();
 
@@ -148,18 +148,18 @@ bool Project::resolve(const std::string& relativePath, fs::path& outPath) {
 	if (relative.has_root_name() || relative.has_root_directory()) return false;
 	if (relative.empty() || *relative.begin() == "..") return false;
 
-	outPath = root / relative;
+	outPath = m_Root / relative;
 	return true;
 }
 
 bool Project::toRelative(const fs::path& path, std::string& outRelativePath) {
-	if (!projectOpen) return false;
+	if (!m_ProjectOpen) return false;
 
 	std::error_code ec;
 	fs::path absolute = fs::absolute(path, ec);
 	if (ec) return false;
 
-	fs::path relative = absolute.lexically_normal().lexically_relative(root);
+	fs::path relative = absolute.lexically_normal().lexically_relative(m_Root);
 	if (relative.empty() || relative == "." || *relative.begin() == "..") return false;
 
 	outRelativePath = relative.generic_string();
@@ -175,7 +175,7 @@ bool Project::isIgnoredDirectory(const fs::path& directory) {
 }
 
 bool Project::isProjectFile(const fs::path& path) {
-	return path == projectArchivePath;
+	return path == m_ProjectArchivePath;
 }
 
 bool Project::copyTransform(uint32_t entityID) {
@@ -227,23 +227,23 @@ bool Project::hasCopiedEntity() {
 }
 
 void Project::setStartupScene(const std::string& relativeScenePath) {
-	if (!projectOpen || startupScene == relativeScenePath) return;
+	if (!m_ProjectOpen || m_StartupScene == relativeScenePath) return;
 
-	startupScene = relativeScenePath;
+	m_StartupScene = relativeScenePath;
 	save();
 }
 
 std::mutex& Project::getSceneMutex() {
-	return sceneMutex;
+	return m_SceneMutex;
 }
 
 bool Project::save() {
 	Archive arch;
-	arch.set("name", name);
-	arch.set("startupScene", startupScene);
+	arch.set("name", m_Name);
+	arch.set("startupScene", m_StartupScene);
 
-	if (!arch.saveToFile(projectArchivePath)) {
-		std::cerr << "[Error] Could not write " << projectArchivePath << '\n';
+	if (!arch.saveToFile(m_ProjectArchivePath)) {
+		std::cerr << "[Error] Could not write " << m_ProjectArchivePath << '\n';
 		return false;
 	}
 

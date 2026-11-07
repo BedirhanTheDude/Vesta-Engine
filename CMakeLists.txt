@@ -10,6 +10,8 @@ set(BUILD_SHARED_LIBS ON)
 add_subdirectory(external/glfw)
 set(BUILD_SHARED_LIBS OFF)
 
+add_subdirectory(external/lunasvg)
+
 find_package(OpenGL REQUIRED)
 
 # Engine sources
@@ -96,30 +98,36 @@ set(SCRIPTING_SRC
     Engine/src/scripting/ScriptLoader.cpp
 )
 
+set(UTILITY_SRC
+    Engine/src/utility/Hash.cpp
+)
+
 # Editor sources
 set(GUI_SRC
-    Editor/gui/EditorCamera.cpp
-    Editor/gui/EditorLayer.cpp
-    Editor/gui/FileManagerPanel.cpp
-    Editor/gui/HierarchyPanel.cpp
-    Editor/gui/ImGuiLayer.cpp
+    Editor/src/gui/EditorCamera.cpp
+    Editor/src/gui/EditorLayer.cpp
+    Editor/src/gui/FileManagerPanel.cpp
+    Editor/src/gui/HierarchyPanel.cpp
+    Editor/src/gui/ImGuiLayer.cpp
+    Editor/src/gui/Thumbnail.cpp
+    Editor/src/gui/SvgPixels.cpp
 )
 
 set(CONTROLLER_SRC
-    Editor/controller/AssetController.cpp
-    Editor/controller/ComponentController.cpp
-    Editor/controller/EditorSelectionController.cpp
-    Editor/controller/EntityController.cpp
-    Editor/controller/FileTypeController.cpp
-    Editor/controller/ProjectController.cpp
-    Editor/controller/SceneController.cpp
-    Editor/controller/ScriptingController.cpp
-    Editor/controller/TransformController.cpp
-    Editor/controller/WindowController.cpp
+    Editor/src/controller/AssetController.cpp
+    Editor/src/controller/ComponentController.cpp
+    Editor/src/controller/EditorSelectionController.cpp
+    Editor/src/controller/EntityController.cpp
+    Editor/src/controller/FileTypeController.cpp
+    Editor/src/controller/ProjectController.cpp
+    Editor/src/controller/SceneController.cpp
+    Editor/src/controller/ScriptingController.cpp
+    Editor/src/controller/TransformController.cpp
+    Editor/src/controller/WindowController.cpp
 )
 
 set(PLATFORM_SRC
-    Editor/platform/FileDialog.cpp
+    Editor/src/platform/FileDialog.cpp
 )
 
 set(IMGUI_SRC
@@ -146,6 +154,7 @@ add_library(Engine SHARED
     ${SCENE_SYSTEM_SRC}
     ${RENDERER_SRC}
     ${SCRIPTING_SRC}
+    ${UTILITY_SRC}
     Engine/src/renderer/glad.c
 )
 
@@ -198,15 +207,18 @@ add_library(Editor STATIC
 )
 
 target_include_directories(Editor PUBLIC
-    Editor
+    Editor/src
     external/imgui
     external/imgui/backends
     external/imguizmo
+    external/lunasvg
 )
 
 target_link_libraries(Editor PUBLIC Engine)
+target_link_libraries(Editor PRIVATE lunasvg)
 
-# Editor (Sandbox.exe)
+# Editor Resources
+file(COPY Editor/resources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY Sandbox/icon.png DESTINATION ${CMAKE_BINARY_DIR})
 
 add_executable(Sandbox Sandbox/src/main.cpp)

@@ -25,8 +25,8 @@ public:
     static void clear();
 
 private:
-    static std::unordered_map<std::string, std::shared_ptr<Mesh>> meshes;
-    static std::unordered_map<std::string, LoadedModel> models;
-    static std::unordered_map<std::string, std::shared_ptr<ShaderProgram>> shaders;
-    static std::unordered_map<std::string, std::shared_ptr<Texture>> textures;
+    static std::unordered_map<std::string, std::shared_ptr<Mesh>> m_Meshes;
+    static std::unordered_map<std::string, LoadedModel> m_Models;
+    static std::unordered_map<std::string, std::shared_ptr<ShaderProgram>> m_Shaders;
+    static std::unordered_map<std::string, std::shared_ptr<Texture>> m_Textures;
 };

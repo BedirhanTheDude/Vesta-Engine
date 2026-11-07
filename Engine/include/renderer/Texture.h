@@ -13,11 +13,11 @@ public:
 
     void bind(unsigned int unit = 0) const;
 
-    bool isLoaded() const { return id != 0; }
+    bool isLoaded() const { return m_Id != 0; }
 
-    const std::string& getName() const { return name; }
-    void setName(const std::string& n) { name = n; }
+    const std::string& getName() const { return m_Name; }
+    void setName(const std::string& n) { m_Name = n; }
 private:
-    unsigned int id = 0;
-    std::string name;
+    unsigned int m_Id = 0;
+    std::string m_Name;
 };

@@ -30,10 +30,10 @@ public:
 	glm::vec3 getLinearVelocity() const;
 	glm::vec3 getAngularVelocity() const;
 
-	bool isKinematic() const { return _isKinematic; }
+	bool isKinematic() const { return m_IsKinematic; }
 private:
-	bool _isKinematic;
+	bool m_IsKinematic;
 
-	float linearDamping = 0.2f;
-	float angularDamping = 0.1f;
+	float m_LinearDamping = 0.2f;
+	float m_AngularDamping = 0.1f;
 };

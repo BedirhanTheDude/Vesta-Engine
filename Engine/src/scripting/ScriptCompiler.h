@@ -10,8 +10,8 @@ class Scene; // remove coupling!
 class ScriptCompiler {
 public:
 	static HMODULE getCurrentDLLHandle();
-	static HMODULE reloadScripts(Scene& scene);
-	static void poll(float dt, Scene& scene);
+	static HMODULE reloadScripts(Scene* scene = nullptr);
+	static void poll(float dt, Scene* scene);
 	static void setPollingEnabled(bool enabled) { pollingEnabled = enabled; }
 
 	static bool compile();

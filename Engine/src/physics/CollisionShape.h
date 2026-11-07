@@ -24,19 +24,19 @@ public:
 	physx::PxShape* getOrCreatePxShape(PhysicsWorld* world, PhysicsMaterial* mat,
 		const glm::vec3& scale);
 
-	CollisionShapeType getType() const { return type; }
+	CollisionShapeType getType() const { return m_Type; }
 
 private:
-	CollisionShapeType type = CollisionShapeType::BoxMesh;
+	CollisionShapeType m_Type = CollisionShapeType::BoxMesh;
 
-	glm::vec3 halfExtents = glm::vec3(0.5f);
-	float radius = 0.5f;
+	glm::vec3 m_HalfExtents = glm::vec3(0.5f);
+	float m_Radius = 0.5f;
 
-	std::vector<glm::vec3> vertices;
-	std::vector<unsigned int> indices;
+	std::vector<glm::vec3> m_Vertices;
+	std::vector<unsigned int> m_Indices;
 
-	physx::PxConvexMesh* cachedConvexMesh = nullptr;
-	physx::PxTriangleMesh* cachedTriangleMesh = nullptr;
+	physx::PxConvexMesh* m_CachedConvexMesh = nullptr;
+	physx::PxTriangleMesh* m_CachedTriangleMesh = nullptr;
 
 	physx::PxConvexMesh* cookConvexMesh(PhysicsWorld* world);
 	physx::PxTriangleMesh* cookTriangleMesh(PhysicsWorld* world);

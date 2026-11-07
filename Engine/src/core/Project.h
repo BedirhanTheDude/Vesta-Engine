@@ -50,13 +50,13 @@ public:
 private:
 	static bool save();
 
-	static std::filesystem::path root;
-	static std::filesystem::path cacheDirectory;
-	static std::filesystem::path projectArchivePath;
-	static std::string name;
-	static std::string startupScene;
+	static std::filesystem::path m_Root;
+	static std::filesystem::path m_CacheDirectory;
+	static std::filesystem::path m_ProjectArchivePath;
+	static std::string m_Name;
+	static std::string m_StartupScene;
 
-	static std::mutex sceneMutex;
+	static std::mutex m_SceneMutex;
 
-	static bool projectOpen;
+	static bool m_ProjectOpen;
 };

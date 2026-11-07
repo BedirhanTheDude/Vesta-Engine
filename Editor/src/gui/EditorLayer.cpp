@@ -29,33 +29,33 @@ void EditorLayer::Init(std::function<void()> onExit) {
 }
 
 void EditorLayer::initFileManager(const std::filesystem::path& projectRoot) {
-    fileManager.init(projectRoot);
+    m_FileManager.init(projectRoot);
 }
 
 void EditorLayer::OnUIRender() {
     ShowDockspace();
     ShowMenuBar();
 
-    if (showStats)
+    if (m_ShowStats)
         ShowStatsPanel();
 
-    if (showHierarchy)
+    if (m_ShowHierarchy)
         ShowHierarchyPanel();
 
-    if (showInspector)
+    if (m_ShowInspector)
         ShowInspectorPanel();
 
-    if (showConsole)
+    if (m_ShowConsole)
         ShowConsolePanel();
 
-    if (showScene)
+    if (m_ShowScene)
         ShowScenePanel();
 
-    if (showGame)
+    if (m_ShowGame)
         ShowGamePanel();
 
-    if (showFileManager)
-        fileManager.show(&showFileManager);
+    if (m_ShowFileManager)
+        m_FileManager.show(&m_ShowFileManager);
 }
 
 void EditorLayer::ShowDockspace() {
@@ -123,12 +123,12 @@ void EditorLayer::ShowMenuBar() {
         }
 
         if (ImGui::BeginMenu("Window")) {
-            ImGui::MenuItem("Stats", nullptr, &showStats);
-            ImGui::MenuItem("Hierarchy", nullptr, &showHierarchy);
-            ImGui::MenuItem("Inspector", nullptr, &showInspector);
-            ImGui::MenuItem("Console", nullptr, &showConsole);
-            ImGui::MenuItem("Scene", nullptr, &showScene);
-            ImGui::MenuItem("Game", nullptr, &showGame);
+            ImGui::MenuItem("Stats", nullptr, &m_ShowStats);
+            ImGui::MenuItem("Hierarchy", nullptr, &m_ShowHierarchy);
+            ImGui::MenuItem("Inspector", nullptr, &m_ShowInspector);
+            ImGui::MenuItem("Console", nullptr, &m_ShowConsole);
+            ImGui::MenuItem("Scene", nullptr, &m_ShowScene);
+            ImGui::MenuItem("Game", nullptr, &m_ShowGame);
             ImGui::EndMenu();
         }
 
@@ -147,7 +147,7 @@ void EditorLayer::ShowMenuBar() {
                 if (ImGui::MenuItem("Stop", "F5")) {
                     SceneController::stopScene();
                 }
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
                 ImGui::Text("PLAYING");
                 ImGui::PopStyleColor();
             }
@@ -186,7 +186,7 @@ void EditorLayer::ShowMenuBar() {
 
         if (ImGui::Button("Create", ImVec2(126, 0)) || confirm) {
             if (strlen(sceneName) > 0 &&
-                SceneController::newScene(sceneName, fileManager.getCurrentDirectory())) {
+                SceneController::newScene(sceneName, m_FileManager.getCurrentDirectory())) {
                 sceneName[0] = '\0';
                 ImGui::CloseCurrentPopup();
             }
@@ -257,7 +257,7 @@ void EditorLayer::ShowMenuBar() {
 }
 
 void EditorLayer::ShowStatsPanel() {
-    ImGui::Begin("Stats", &showStats);
+    ImGui::Begin("Stats", &m_ShowStats);
 
     ImGuiIO& io = ImGui::GetIO();
     ImGui::Text("FPS: %.1f", io.Framerate);
@@ -275,7 +275,7 @@ void EditorLayer::ShowStatsPanel() {
 }
 
 void EditorLayer::ShowHierarchyPanel() {
-    hierarchyPanel.show(&showHierarchy);
+    m_Hierarchy.show(&m_ShowHierarchy);
 }
 
 void EditorLayer::ShowInspectorPanel() {
@@ -465,7 +465,7 @@ void EditorLayer::ShowInspectorPanel() {
         }
         };
 
-    ImGui::Begin("Inspector", &showInspector);
+    ImGui::Begin("Inspector", &m_ShowInspector);
 
     inspectorFocused = ImGui::IsWindowFocused();
 
@@ -616,7 +616,7 @@ void EditorLayer::ShowInspectorPanel() {
 
 // this is currently useless
 void EditorLayer::ShowConsolePanel() {
-    ImGui::Begin("Console", &showConsole);
+    ImGui::Begin("Console", &m_ShowConsole);
 
     ImGui::TextWrapped("[Info] Engine initialized successfully.");
     ImGui::TextWrapped("[Info] ImGui editor loaded.");
@@ -633,7 +633,7 @@ void EditorLayer::ShowScenePanel() {
     static ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
     static bool gizmoLocal = true;
 
-    ImGui::Begin("Scene", &showScene);
+    ImGui::Begin("Scene", &m_ShowScene);
 
     if (ImGui::Button("Translate")) op = ImGuizmo::TRANSLATE;
     ImGui::SameLine();
@@ -651,7 +651,7 @@ void EditorLayer::ShowScenePanel() {
 
     ImVec2 imagePos = ImGui::GetCursorScreenPos();
     ImVec2 imageSize = ImGui::GetContentRegionAvail();
-    sceneViewSize = imageSize;
+    m_SceneViewSize = imageSize;
 
     if (sceneViewTexture && imageSize.x > 0 && imageSize.y > 0) {
         ImGui::Image((ImTextureID)(intptr_t)sceneViewTexture, imageSize,
@@ -703,10 +703,10 @@ void EditorLayer::ShowScenePanel() {
 }
 
 void EditorLayer::ShowGamePanel() {
-    ImGui::Begin("Game", &showGame);
-    gameViewSize = ImGui::GetContentRegionAvail();
-    if (gameViewTexture && gameViewSize.x > 0 && gameViewSize.y > 0) {
-        ImGui::Image((ImTextureID)(intptr_t)gameViewTexture, gameViewSize,
+    ImGui::Begin("Game", &m_ShowGame);
+    m_GameViewSize = ImGui::GetContentRegionAvail();
+    if (gameViewTexture && m_GameViewSize.x > 0 && m_GameViewSize.y > 0) {
+        ImGui::Image((ImTextureID)(intptr_t)gameViewTexture, m_GameViewSize,
             ImVec2(0, 1), ImVec2(1, 0));
     }
     ImGui::End();

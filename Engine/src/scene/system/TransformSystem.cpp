@@ -61,9 +61,25 @@ namespace TransformSystem {
 
     static void invalidate(Transform& transform, Scene* scene);
 
-    // don't know yet
-    void serialize(const Transform& transform, Archive& arch) {};
-    void deserialize(Transform& transform, const Archive& arch) {};
+    void serialize(const Transform& transform, Archive& arch) {
+        // world space, the parent is re-applied (keeping the world transform) once every entity exists
+        arch.set("position", transform.position);
+        arch.set("rotation", transform.rotation);
+        arch.set("scale", transform.scale);
+    };
+
+    void deserialize(Transform& transform, const Archive& arch) {
+        glm::vec3 pos(0.0f), scl(1.0f);
+        glm::quat rot(1.0f, 0.0f, 0.0f, 0.0f);
+        arch.get("position", pos);
+        arch.get("rotation", rot);
+        arch.get("scale", scl);
+
+        // Has to go through this for cache invalidation
+        TransformSystem::setPosition(transform, pos);
+        TransformSystem::setRotation(transform, rot);
+        TransformSystem::setScale(transform, scl);
+    };
 
 	glm::mat4 getMatrix(const Transform& transform, Scene* scene) {
         if (transform.isMatrixValid)

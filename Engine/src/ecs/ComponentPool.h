@@ -14,26 +14,26 @@ namespace ECS {
 	class ComponentPool : public IComponentPool {
 	public:
 		bool has(EntityHandle entity) const override {
-			if (entity.isInvalid() || entity >= static_cast<uint32_t>(sparse.size()))
+			if (entity.isInvalid() || entity >= static_cast<uint32_t>(m_Sparse.size()))
 				return false;
 
-			uint32_t index = sparse[entity];
+			uint32_t index = m_Sparse[entity];
 
 			return index != INVALID_ENTITY_INDEX &&
-				index < static_cast<uint32_t>(entities.size()) &&
-				entities[index] == entity; // check entityhandle because swap and pop may have changed it (can't trust index)
+				index < static_cast<uint32_t>(m_Entities.size()) &&
+				m_Entities[index] == entity; // check entityhandle because swap and pop may have changed it (can't trust index)
 		}
 
 		T& add(EntityHandle entity) {
 			// TODO: Add error message of adding a component to entity that already has it after proper console tooling
 			assert(!has(entity) && !entity.isInvalid());
 
-			T& ref = components.emplace_back();
-			entities.push_back(entity);
+			T& ref = m_Components.emplace_back();
+			m_Entities.push_back(entity);
 
 			ensureSparseSize(entity);
 
-			sparse[entity] = static_cast<uint32_t>(entities.size()) - 1;
+			m_Sparse[entity] = static_cast<uint32_t>(m_Entities.size()) - 1;
 
 			return ref;
 		}
@@ -41,13 +41,13 @@ namespace ECS {
 		T& add(EntityHandle entity, T value) {
 			assert(!has(entity) && !entity.isInvalid());
 
-			components.push_back(std::move(value));
-			T& ref = components.back();
-			entities.push_back(entity);
+			m_Components.push_back(std::move(value));
+			T& ref = m_Components.back();
+			m_Entities.push_back(entity);
 
 			ensureSparseSize(entity);
 
-			sparse[entity] = static_cast<uint32_t>(entities.size()) - 1;
+			m_Sparse[entity] = static_cast<uint32_t>(m_Entities.size()) - 1;
 
 			return ref;
 		}
@@ -55,42 +55,42 @@ namespace ECS {
 		void remove(EntityHandle entity) override {
 			if (!has(entity)) return;
 
-			uint32_t denseIndex = sparse[entity];
+			uint32_t denseIndex = m_Sparse[entity];
 
-			uint32_t last = static_cast<uint32_t>(components.size() - 1);
+			uint32_t last = static_cast<uint32_t>(m_Components.size() - 1);
 
 			if (denseIndex != last) {
-				components[denseIndex] = std::move(components[last]);
+				m_Components[denseIndex] = std::move(m_Components[last]);
 
-				EntityHandle movedEntity = entities[last];
+				EntityHandle movedEntity = m_Entities[last];
 
-				entities[denseIndex] = movedEntity;
-				sparse[movedEntity] = denseIndex;
+				m_Entities[denseIndex] = movedEntity;
+				m_Sparse[movedEntity] = denseIndex;
 			}
 
-			components.pop_back();
-			entities.pop_back();
-			sparse[entity] = INVALID_ENTITY_INDEX;
+			m_Components.pop_back();
+			m_Entities.pop_back();
+			m_Sparse[entity] = INVALID_ENTITY_INDEX;
 		}
 
 		T* get(EntityHandle entity) {
 			if (!has(entity))
 				return nullptr;
 
-			return &components[sparse[entity]];
+			return &m_Components[m_Sparse[entity]];
 		}
 
 		const T* get(EntityHandle entity) const {
 			if (!has(entity))
 				return nullptr;
 
-			return &components[sparse[entity]];
+			return &m_Components[m_Sparse[entity]];
 		}
 
 		void reset() override {
-			components.clear();
-			entities.clear();
-			sparse.clear();
+			m_Components.clear();
+			m_Entities.clear();
+			m_Sparse.clear();
 		}
 
 		// IComponentPool: the caller has to check has() first, add() asserts on a duplicate
@@ -99,9 +99,9 @@ namespace ECS {
 
 	private:
 		// components and entities are dense
-		std::vector<T> components;
-		std::vector<EntityHandle> entities; // entities[i] is the handle of the owner of components[i]
-		std::vector<uint32_t> sparse; // entity handle -> dense index
+		std::vector<T> m_Components;
+		std::vector<EntityHandle> m_Entities; // entities[i] is the handle of the owner of components[i]
+		std::vector<uint32_t> m_Sparse; // entity handle -> dense index
 
 		struct Iterator {
 			ComponentPool* pool;
@@ -114,8 +114,8 @@ namespace ECS {
 
 			Item operator*() const {
 				return {
-					pool->entities[index],
-					pool->components[index]
+					pool->m_Entities[index],
+					pool->m_Components[index]
 				};
 			}
 
@@ -132,10 +132,10 @@ namespace ECS {
 		void ensureSparseSize(EntityHandle entity) {
 			assert(!entity.isInvalid());
 
-			std::size_t sparseSize = sparse.size();
+			std::size_t sparseSize = m_Sparse.size();
 
 			if (entity >= static_cast<uint32_t>(sparseSize))
-				sparse.resize(std::max(sparseSize * 2, static_cast<std::size_t>(entity.entityId + 1)), INVALID_ENTITY_INDEX);
+				m_Sparse.resize(std::max(sparseSize * 2, static_cast<std::size_t>(entity.entityId + 1)), INVALID_ENTITY_INDEX);
 		}
 
 	public:
@@ -144,7 +144,7 @@ namespace ECS {
 		}
 
 		Iterator end() {
-			return { this, components.size() };
+			return { this, m_Components.size() };
 		}
 	};
 }

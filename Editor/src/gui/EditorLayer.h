@@ -19,8 +19,8 @@ public:
 
     void OnUIRender();
     void OnEntityRemoved(Entity* entity);
-    ImVec2 getSceneViewSize() const { return sceneViewSize; }
-    ImVec2 getGameViewSize() const { return gameViewSize; }
+    ImVec2 getSceneViewSize() const { return m_SceneViewSize; }
+    ImVec2 getGameViewSize() const { return m_GameViewSize; }
 
     EditorCamera editorCamera;
     unsigned int sceneViewTexture = 0;
@@ -39,17 +39,17 @@ private:
     void ShowConsolePanel();
     void ShowScenePanel();
     void ShowGamePanel();
-    ImVec2 sceneViewSize = ImVec2(1000, 800);
-    ImVec2 gameViewSize = ImVec2(1000, 800);
+    ImVec2 m_SceneViewSize = ImVec2(1000, 800);
+    ImVec2 m_GameViewSize = ImVec2(1000, 800);
 
-    bool showStats = true;
-    bool showHierarchy = true;
-    bool showInspector = true;
-    bool showConsole = true;
-    bool showScene = true;
-    bool showGame = true;
-    bool showFileManager = true;
+    bool m_ShowStats = true;
+    bool m_ShowHierarchy = true;
+    bool m_ShowInspector = true;
+    bool m_ShowConsole = true;
+    bool m_ShowScene = true;
+    bool m_ShowGame = true;
+    bool m_ShowFileManager = true;
 
-    FileManagerPanel fileManager;
-    HierarchyPanel hierarchyPanel;
+    FileManagerPanel m_FileManager;
+    HierarchyPanel m_Hierarchy;
 };

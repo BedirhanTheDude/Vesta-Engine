@@ -17,8 +17,8 @@ namespace ECS {
 
         void reset();
     private:
-        std::vector<uint8_t> alive; // boolean
-        std::vector<uint32_t> generations; // current generation per index, bumped on destroy
-        std::vector<uint32_t> freeList; // indices freed by destroy(), available for reuse by create()
+        std::vector<uint8_t> m_Alive; // boolean
+        std::vector<uint32_t> m_Generations; // current generation per index, bumped on destroy
+        std::vector<uint32_t> m_FreeList; // indices freed by destroy(), available for reuse by create()
     };
 }

@@ -37,17 +37,19 @@ struct ComponentOps {
 // for registering ONLY built-in components
 // this self-registering lambda gets invoked before main(), how cool is that?
 #define REGISTER(Type) \
-    inline bool _autoReg_##Type = []() { \
-        ComponentTypeInfo<Type>::name = #Type; \
-        unsigned int UID = componentTypeUID<Type>(); \
-        __componentTypeUIDToString(UID, true, #Type); \
-        ComponentFactory::registerBuiltIn(#Type, [](Entity& e, const Archive& j) { \
-            auto&& c = e.addComponentDeferred<Type>(); \
-            c.deserialize(j); \
-            c.onAttach(); \
-        }, COMPONENT_OPS(Type)); \
-        return true; \
-    }()
+    namespace { \
+        inline bool _autoReg_##Type = []() { \
+            ComponentTypeInfo<Type>::name = #Type; \
+            unsigned int UID = componentTypeUID<Type>(); \
+            __componentTypeUIDToString(UID, true, #Type); \
+            ComponentFactory::registerBuiltIn(#Type, [](Entity& e, const Archive& j) { \
+                auto&& c = e.addComponentDeferred<Type>(); \
+                c.deserialize(j); \
+                c.onAttach(); \
+            }, COMPONENT_OPS(Type)); \
+            return true; \
+        }() \
+    }
 
 class ComponentFactory {
 public:
@@ -75,7 +77,7 @@ public:
     static const std::vector<std::string>& getScriptNames();
 
 private:
-    static bool scriptCacheValid;
+    static bool m_ScriptCacheValid;
 
     struct Entry {
         Creator creator;

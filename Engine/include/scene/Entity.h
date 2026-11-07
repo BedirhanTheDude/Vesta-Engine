@@ -29,12 +29,12 @@ public:
     Entity(Scene* owningScene, const ECS::EntityHandle& handle);
     ECS::EntityHandle getHandle() const;
 
-    uint32_t getID() const { return entityId; }
+    uint32_t getID() const { return m_EntityId; }
 
     std::string getName() const;
     void setName(const std::string& newName) const;
 
-    Scene& getScene() const { return *scene; }
+    Scene& getScene() const { return *m_Scene; }
 
     bool isValid() const;
 
@@ -42,7 +42,7 @@ public:
     bool isAlive() const;
 
     bool operator==(const Entity& other) const {
-        return scene == other.scene && entityId == other.entityId && generation == other.generation;
+        return m_Scene == other.m_Scene && m_EntityId == other.m_EntityId && m_Generation == other.m_Generation;
     }
     bool operator!=(const Entity& other) const { return !(*this == other); }
 
@@ -166,7 +166,7 @@ private:
     BehaviourComponent* addBehaviourRaw(unsigned int UID, std::unique_ptr<BehaviourComponent> behaviour) const;
     BehaviourComponent* getBehaviourRaw(unsigned int UID) const;
 
-    Scene* scene = nullptr;
-    uint32_t entityId = UINT32_MAX;
-    uint32_t generation = UINT32_MAX;
+    Scene* m_Scene = nullptr;
+    uint32_t m_EntityId = UINT32_MAX;
+    uint32_t m_Generation = UINT32_MAX;
 };

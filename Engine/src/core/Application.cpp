@@ -6,42 +6,42 @@
 #include <scene/Scene.h>
 #include <renderer/Renderer.h>
 
-std::unique_ptr<Scene> Application::scene;
-std::unique_ptr<Renderer> Application::renderer;
+std::unique_ptr<Scene> Application::m_Scene;
+std::unique_ptr<Renderer> Application::m_Renderer;
 
-GLFWwindow* Application::window = nullptr;
+GLFWwindow* Application::m_Window = nullptr;
 
 Scene* Application::newScene(const std::string& relativeScenePath) {
-	scene = std::unique_ptr<Scene>(new Scene());
+	m_Scene = std::unique_ptr<Scene>(new Scene());
 
-	if (Project::isOpen() && (relativeScenePath.empty() || !scene->openScene(relativeScenePath)))
-		Scene::createDefaultScene(*scene);
+	if (Project::isOpen() && (relativeScenePath.empty() || !m_Scene->openScene(relativeScenePath)))
+		Scene::createDefaultScene(*m_Scene);
 
-	return scene.get();
+	return m_Scene.get();
 }
 
 Scene* Application::getCurrentScene() {
-	return scene.get();
+	return m_Scene.get();
 }
 
 Renderer* Application::newRenderer() {
-	renderer = std::unique_ptr<Renderer>(new Renderer());
-	return renderer.get();
+	m_Renderer = std::unique_ptr<Renderer>(new Renderer());
+	return m_Renderer.get();
 }
 
 Renderer* Application::getCurrentRenderer() {
-	return renderer.get();
+	return m_Renderer.get();
 }
 
 void Application::setWindow(GLFWwindow* w) {
-	window = w;
+	m_Window = w;
 }
 
 GLFWwindow* Application::getWindow() {
-	return window;
+	return m_Window;
 }
 
 void Application::shutdown() {
-	scene.reset();
-	renderer.reset();
+	m_Scene.reset();
+	m_Renderer.reset();
 }

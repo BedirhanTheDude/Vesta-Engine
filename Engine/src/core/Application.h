@@ -22,7 +22,7 @@ public:
 	static void shutdown();
 
 private:
-	static std::unique_ptr<Scene> scene;
-	static std::unique_ptr<Renderer> renderer;
-	static GLFWwindow* window;
+	static std::unique_ptr<Scene> m_Scene;
+	static std::unique_ptr<Renderer> m_Renderer;
+	static GLFWwindow* m_Window;
 };

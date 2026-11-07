@@ -3,11 +3,11 @@
 #include <renderer/Mesh.h>
 
 void PhysicsWorld::init() {
-	gFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, gAllocator, gErrorCallback);
+	m_GFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_GAllocator, m_GErrorCallback);
 
 	PxTolerancesScale scale;
-	gPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *gFoundation, scale);
-	PxInitExtensions(*gPhysics, nullptr);
+	m_GPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_GFoundation, scale);
+	PxInitExtensions(*m_GPhysics, nullptr);
 
 	PxSceneDesc sceneDesc(scale);
 	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
@@ -15,36 +15,36 @@ void PhysicsWorld::init() {
 	sceneDesc.flags |= PxSceneFlag::eENABLE_STABILIZATION;
 	sceneDesc.bounceThresholdVelocity = 0.5f;
 
-	gDispatcher = PxDefaultCpuDispatcherCreate(2);
-	sceneDesc.cpuDispatcher = gDispatcher;
+	m_GDispatcher = PxDefaultCpuDispatcherCreate(2);
+	sceneDesc.cpuDispatcher = m_GDispatcher;
 
-	gScene = gPhysics->createScene(sceneDesc);
+	m_GScene = m_GPhysics->createScene(sceneDesc);
 
-	defaultMaterial = std::make_shared<PhysicsMaterial>();
-	defaultMaterial->getOrCreate(this);
+	m_DefaultMaterial = std::make_shared<PhysicsMaterial>();
+	m_DefaultMaterial->getOrCreate(this);
 }
 
 void PhysicsWorld::shutdown() {
-	shapeCache.clear();
+	m_ShapeCache.clear();
 
-	gScene->release();
-	gDispatcher->release();
+	m_GScene->release();
+	m_GDispatcher->release();
 	PxCloseExtensions();
-	gPhysics->release();
-	gFoundation->release();
+	m_GPhysics->release();
+	m_GFoundation->release();
 }
 
 void PhysicsWorld::step(float dt) {
-	gScene->simulate(dt);
-	gScene->fetchResults(true);
+	m_GScene->simulate(dt);
+	m_GScene->fetchResults(true);
 }
 
 void PhysicsWorld::addActor(PxActor& actor) {
-	gScene->addActor(actor);
+	m_GScene->addActor(actor);
 }
 
 void PhysicsWorld::removeActor(PxActor& actor) {
-	gScene->removeActor(actor);
+	m_GScene->removeActor(actor);
 }
 
 std::shared_ptr<CollisionShape> PhysicsWorld::getOrCreateShape(
@@ -52,8 +52,8 @@ std::shared_ptr<CollisionShape> PhysicsWorld::getOrCreateShape(
 
 	ShapeCacheKey key{ mesh, forceConvex };
 
-	auto it = shapeCache.find(key);
-	if (it != shapeCache.end())
+	auto it = m_ShapeCache.find(key);
+	if (it != m_ShapeCache.end())
 		return it->second;
 
 	std::shared_ptr<CollisionShape> shape;
@@ -81,14 +81,14 @@ std::shared_ptr<CollisionShape> PhysicsWorld::getOrCreateShape(
 		shape = std::make_shared<CollisionShape>(
 			CollisionShape::convexMesh(mesh->getVertices()));
 
-	shapeCache[key] = shape;
+	m_ShapeCache[key] = shape;
 	return shape;
 }
 
 void PhysicsWorld::cleanShapeCache() {
-	for (auto it = shapeCache.begin(); it != shapeCache.end();) {
+	for (auto it = m_ShapeCache.begin(); it != m_ShapeCache.end();) {
 		if (it->second.use_count() == 1)
-			it = shapeCache.erase(it);
+			it = m_ShapeCache.erase(it);
 		else
 			++it;
 	}

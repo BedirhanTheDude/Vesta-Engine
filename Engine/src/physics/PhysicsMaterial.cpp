@@ -3,28 +3,28 @@
 #include <physics/PhysicsWorld.h>
 
 PhysicsMaterial::~PhysicsMaterial() {
-	pxMat = nullptr;
+	m_PxMat = nullptr;
 }
 
 physx::PxMaterial* PhysicsMaterial::getOrCreate(PhysicsWorld* world) {
-	if (!pxMat && world)
-		pxMat = world->getPhysics()->createMaterial(staticFriction, dynamicFriction, restitution);
-	else if (!pxMat && !world) return nullptr;
+	if (!m_PxMat && world)
+		m_PxMat = world->getPhysics()->createMaterial(staticFriction, dynamicFriction, restitution);
+	else if (!m_PxMat && !world) return nullptr;
 	
-	return pxMat;
+	return m_PxMat;
 }
 
 void PhysicsMaterial::setStaticFriction(float sf) {
 	staticFriction = sf;
-	if (pxMat) pxMat->setStaticFriction(sf);
+	if (m_PxMat) m_PxMat->setStaticFriction(sf);
 }
 
 void PhysicsMaterial::setDynamicFriction(float df) {
 	dynamicFriction = df;
-	if (pxMat) pxMat->setDynamicFriction(df);
+	if (m_PxMat) m_PxMat->setDynamicFriction(df);
 }
 
 void PhysicsMaterial::setRestitution(float res) {
 	restitution = res;
-	if (pxMat) pxMat->setRestitution(res);
+	if (m_PxMat) m_PxMat->setRestitution(res);
 }

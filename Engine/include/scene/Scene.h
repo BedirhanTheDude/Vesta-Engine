@@ -27,15 +27,15 @@ public:
 
     static void createDefaultScene(Scene& scene);
 
-    void renameScene(const std::string& name) { sceneName = name; }
+    void renameScene(const std::string& name) { m_SceneName = name; }
     void newScene(const std::string& sceneName = "scene");
     bool openScene(const std::string& relativeScenePath);
 
-    std::string getSceneName() const { return sceneName; }
-    void setSceneName(const std::string& name) { sceneName = name; }
+    std::string getSceneName() const { return m_SceneName; }
+    void setSceneName(const std::string& name) { m_SceneName = name; }
 
-    const std::string& getScenePath() const { return scenePath; }
-    void setScenePath(const std::string& relativeScenePath) { scenePath = relativeScenePath; }
+    const std::string& getScenePath() const { return m_ScenePath; }
+    void setScenePath(const std::string& relativeScenePath) { m_ScenePath = relativeScenePath; }
 
     Entity createEntity(const std::string& name);
     Entity createEntity(const std::string& name, const Entity& parent);
@@ -105,32 +105,32 @@ private:
     void pushRigidBodies(); // transform -> physics world
     void pullRigidBodies(); // physics world -> transform
 
-    float physicsAccumulator = 0.0f;
-    float colliderCacheTimer = 0.0f;
+    float m_PhysicsAccumulator = 0.0f;
+    float m_ColliderCacheTimer = 0.0f;
 
-    std::unique_ptr<PhysicsWorld> physicsWorld;
+    std::unique_ptr<PhysicsWorld> m_PhysicsWorld;
 
-    std::string sceneName;
-    std::string scenePath;
+    std::string m_SceneName;
+    std::string m_ScenePath;
 
     // "no camera" is entityId == generation == UINT32_MAX, same sentinel values as
     // ECS::INVALID_ENTITY_HANDLE; stored as raw fields (not ECS::EntityHandle) so this
     // header doesn't need EntityHandle.h just to declare two integers.
-    uint32_t activeCameraEntityId;
-    uint32_t activeCameraGeneration;
+    uint32_t m_ActiveCameraEntityId;
+    uint32_t m_ActiveCameraGeneration;
 
     // Entity is only a handle, the state that used to live inside it lives beside it here:
     // entityNames[i] is the name of entities[i], both are moved by the same swap-and-pop
-    std::vector<Entity> entities;
-    std::vector<std::string> entityNames;
+    std::vector<Entity> m_Entities;
+    std::vector<std::string> m_EntityNames;
 
     // created but not flushed into `entities` yet, namesToAdd[i] belongs to entitiesToAdd[i]
-    std::vector<Entity> entitiesToAdd;
-    std::vector<std::string> namesToAdd;
+    std::vector<Entity> m_EntitiesToAdd;
+    std::vector<std::string> m_NamesToAdd;
 
-    std::vector<Entity> entitiesToRemove;
+    std::vector<Entity> m_EntitiesToRemove;
 
-    std::vector<uint32_t> sparseEntities; // Sparse index vector for entities, handle.entityId -> dense index in entities
+    std::vector<uint32_t> m_SparseEntities; // Sparse index vector for entities, handle.entityId -> dense index in entities
 
     // Scratch of tickBehaviours, kept between frames so its capacity is reused instead of allocating every
     // frame. An entity handle as raw fields, same reason as activeCameraEntityId.
@@ -139,8 +139,8 @@ private:
         uint32_t entityId;
         uint32_t generation;
     };
-    std::vector<BehaviourTickEntry> behaviourTickList;
+    std::vector<BehaviourTickEntry> m_BehaviourTickList;
 
-    std::unique_ptr<ECS::EntityManager> entityManager;
-    std::unique_ptr<ECS::ComponentPoolRegistry> componentRegistry;
+    std::unique_ptr<ECS::EntityManager> m_EntityManager;
+    std::unique_ptr<ECS::ComponentPoolRegistry> m_ComponentRegistry;
 };

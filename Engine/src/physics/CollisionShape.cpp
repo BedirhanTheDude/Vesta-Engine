@@ -7,41 +7,41 @@
 using namespace physx;
 
 CollisionShape::~CollisionShape() {
-    if (cachedConvexMesh) cachedConvexMesh->release();
-    if (cachedTriangleMesh) cachedTriangleMesh->release();
+    if (m_CachedConvexMesh) m_CachedConvexMesh->release();
+    if (m_CachedTriangleMesh) m_CachedTriangleMesh->release();
 }
 
 CollisionShape CollisionShape::boxMesh(const glm::vec3& halfExtents) {
     CollisionShape s;
-    s.type = CollisionShapeType::BoxMesh;
-    s.halfExtents = halfExtents;
+    s.m_Type = CollisionShapeType::BoxMesh;
+    s.m_HalfExtents = halfExtents;
     return s;
 }
 
 CollisionShape CollisionShape::sphereMesh(float radius) {
     CollisionShape s;
-    s.type = CollisionShapeType::SphereMesh;
-    s.radius = radius;
+    s.m_Type = CollisionShapeType::SphereMesh;
+    s.m_Radius = radius;
     return s;
 }
 
 CollisionShape CollisionShape::convexMesh(const std::vector<Vertex>& meshVertices) {
     CollisionShape s;
-    s.type = CollisionShapeType::ConvexMesh;
-    s.vertices.reserve(meshVertices.size());
+    s.m_Type = CollisionShapeType::ConvexMesh;
+    s.m_Vertices.reserve(meshVertices.size());
     for (const Vertex& v : meshVertices)
-        s.vertices.push_back(v.position);
+        s.m_Vertices.push_back(v.position);
     return s;
 }
 
 CollisionShape CollisionShape::triangleMesh(const std::vector<Vertex>& meshVertices,
     const std::vector<unsigned int>& meshIndices) {
     CollisionShape s;
-    s.type = CollisionShapeType::TriangleMesh;
-    s.vertices.reserve(meshVertices.size());
+    s.m_Type = CollisionShapeType::TriangleMesh;
+    s.m_Vertices.reserve(meshVertices.size());
     for (const Vertex& v : meshVertices)
-        s.vertices.push_back(v.position);
-    s.indices = meshIndices;
+        s.m_Vertices.push_back(v.position);
+    s.m_Indices = meshIndices;
     return s;
 }
 
@@ -51,35 +51,35 @@ PxShape* CollisionShape::getOrCreatePxShape(PhysicsWorld* world, PhysicsMaterial
     PxMaterial* pxMat = mat->getOrCreate(world);
     if (!pxMat) return nullptr;
 
-    switch (type) {
+    switch (m_Type) {
     case CollisionShapeType::BoxMesh: {
         return physics->createShape(
-            PxBoxGeometry(toPx(halfExtents * scale)), *pxMat, true);
+            PxBoxGeometry(toPx(m_HalfExtents * scale)), *pxMat, true);
     }
 
     case CollisionShapeType::SphereMesh: {
-        float r = radius * glm::max(scale.x, glm::max(scale.y, scale.z));
+        float r = m_Radius * glm::max(scale.x, glm::max(scale.y, scale.z));
         return physics->createShape(PxSphereGeometry(r), *pxMat, true);
     }
 
     case CollisionShapeType::ConvexMesh: {
-        if (!cachedConvexMesh)
-            cachedConvexMesh = cookConvexMesh(world);
-        if (!cachedConvexMesh) return nullptr;
+        if (!m_CachedConvexMesh)
+            m_CachedConvexMesh = cookConvexMesh(world);
+        if (!m_CachedConvexMesh) return nullptr;
 
         PxMeshScale meshScale(toPx(scale));
         return physics->createShape(
-            PxConvexMeshGeometry(cachedConvexMesh, meshScale), *pxMat, true);
+            PxConvexMeshGeometry(m_CachedConvexMesh, meshScale), *pxMat, true);
     }
 
     case CollisionShapeType::TriangleMesh: {
-        if (!cachedTriangleMesh)
-            cachedTriangleMesh = cookTriangleMesh(world);
-        if (!cachedTriangleMesh) return nullptr;
+        if (!m_CachedTriangleMesh)
+            m_CachedTriangleMesh = cookTriangleMesh(world);
+        if (!m_CachedTriangleMesh) return nullptr;
 
         PxMeshScale meshScale(toPx(scale));
         return physics->createShape(
-            PxTriangleMeshGeometry(cachedTriangleMesh, meshScale), *pxMat, true);
+            PxTriangleMeshGeometry(m_CachedTriangleMesh, meshScale), *pxMat, true);
     }
     }
     return nullptr;
@@ -89,9 +89,9 @@ PxConvexMesh* CollisionShape::cookConvexMesh(PhysicsWorld* world) {
     PxPhysics* physics = world->getPhysics();
 
     PxConvexMeshDesc desc;
-    desc.points.count = static_cast<PxU32>(vertices.size());
+    desc.points.count = static_cast<PxU32>(m_Vertices.size());
     desc.points.stride = sizeof(PxVec3);
-    desc.points.data = vertices.data();
+    desc.points.data = m_Vertices.data();
     desc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
     desc.vertexLimit = 255;
     desc.polygonLimit = 255;
@@ -101,7 +101,7 @@ PxConvexMesh* CollisionShape::cookConvexMesh(PhysicsWorld* world) {
     PxCookingParams params(physics->getTolerancesScale());
 
     if (!PxCookConvexMesh(params, desc, buf)) {
-        printf("Convex cooking failed! Vertex count: %d\n", (int)vertices.size());
+        printf("Convex cooking failed! Vertex count: %d\n", (int)m_Vertices.size());
         return nullptr;
     }
 
@@ -113,18 +113,18 @@ PxTriangleMesh* CollisionShape::cookTriangleMesh(PhysicsWorld* world) {
     PxPhysics* physics = world->getPhysics();
 
     PxTriangleMeshDesc desc;
-    desc.points.count = static_cast<PxU32>(vertices.size());
+    desc.points.count = static_cast<PxU32>(m_Vertices.size());
     desc.points.stride = sizeof(glm::vec3);
-    desc.points.data = vertices.data();
-    desc.triangles.count = static_cast<PxU32>(indices.size() / 3);
+    desc.points.data = m_Vertices.data();
+    desc.triangles.count = static_cast<PxU32>(m_Indices.size() / 3);
     desc.triangles.stride = 3 * sizeof(unsigned int);
-    desc.triangles.data = indices.data();
+    desc.triangles.data = m_Indices.data();
 
     PxDefaultMemoryOutputStream buf;
     PxCookingParams params(physics->getTolerancesScale());
 
     if (!PxCookTriangleMesh(params, desc, buf)) {
-        printf("Triangle mesh cooking failed! Vertex count: %d\n", (int)vertices.size());
+        printf("Triangle mesh cooking failed! Vertex count: %d\n", (int)m_Vertices.size());
         return nullptr;
     }
 

@@ -30,8 +30,8 @@ public:
 protected:
 	virtual void cleanup();
 
-	physx::PxRigidActor* actor = nullptr;
-	std::shared_ptr<PhysicsMaterial> mat;
-	std::shared_ptr<CollisionShape> shape;
-	PhysicsWorld* world;
+	physx::PxRigidActor* m_Actor = nullptr;
+	std::shared_ptr<PhysicsMaterial> m_Mat;
+	std::shared_ptr<CollisionShape> m_Shape;
+	PhysicsWorld* m_World;
 };

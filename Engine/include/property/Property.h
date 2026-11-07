@@ -56,10 +56,10 @@ public:
 
     void registerProperty(const std::string& name, PropertyType type, void* ptr, std::function<void()> callback = nullptr,
         unsigned int groupID = 0, const std::string& groupName = "defaultGroup", Property prop = {}) {
-        if (groupID >= propertyGroups.size())
-            propertyGroups.resize(groupID + 1);
+        if (groupID >= m_PropertyGroups.size())
+            m_PropertyGroups.resize(groupID + 1);
 
-        PropertyGroup& group = propertyGroups[groupID];
+        PropertyGroup& group = m_PropertyGroups[groupID];
         if (group.name.empty())
             group.name = camelToWords(groupName);
 
@@ -78,16 +78,16 @@ public:
 
     std::map<unsigned int, Property>& getProperties(unsigned int groupID = 0) {
         static std::map<unsigned int, Property> empty;
-        if (groupID < propertyGroups.size()) return propertyGroups[groupID].properties;
+        if (groupID < m_PropertyGroups.size()) return m_PropertyGroups[groupID].properties;
         return empty;
     }
     const std::map<unsigned int, Property>& getProperties(unsigned int groupID = 0) const {
         static const std::map<unsigned int, Property> empty;
-        if (groupID < propertyGroups.size()) return propertyGroups[groupID].properties;
+        if (groupID < m_PropertyGroups.size()) return m_PropertyGroups[groupID].properties;
         return empty;
     }
-    std::vector<PropertyGroup>& getPropertyGroups() { return propertyGroups; }
-    const std::vector<PropertyGroup>& getPropertyGroups() const { return propertyGroups; }
+    std::vector<PropertyGroup>& getPropertyGroups() { return m_PropertyGroups; }
+    const std::vector<PropertyGroup>& getPropertyGroups() const { return m_PropertyGroups; }
 
     /*template<typename T>
     T* getPropertyValue(const std::string& name, unsigned int groupID = 0) {
@@ -105,5 +105,5 @@ public:
     }*/
 
 protected:
-    std::vector<PropertyGroup> propertyGroups;
+    std::vector<PropertyGroup> m_PropertyGroups;
 };

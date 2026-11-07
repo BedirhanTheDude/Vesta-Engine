@@ -46,10 +46,10 @@ class PayloadHolder {
 public:
     void registerPayload(const std::string& name, PayloadType type, void* ptr,
         unsigned int groupID = 0, std::string groupName = "defaultGroup") {
-        if (groupID >= payloadGroups.size())
-            payloadGroups.resize(groupID + 1);
+        if (groupID >= m_PayloadGroups.size())
+            m_PayloadGroups.resize(groupID + 1);
 
-        PayloadGroup& group = payloadGroups[groupID];
+        PayloadGroup& group = m_PayloadGroups[groupID];
         if (group.name.empty())
             group.name = camelToWords(groupName);
 
@@ -64,11 +64,11 @@ public:
 
     std::map<unsigned int, Payload>& getPayloads(unsigned int groupID = 0) {
         static std::map<unsigned int, Payload> empty;
-        if (groupID < payloadGroups.size()) return payloadGroups[groupID].payloads;
+        if (groupID < m_PayloadGroups.size()) return m_PayloadGroups[groupID].payloads;
         return empty;
     }
-    std::vector<PayloadGroup>& getPayloadGroups() { return payloadGroups; }
+    std::vector<PayloadGroup>& getPayloadGroups() { return m_PayloadGroups; }
 
 protected:
-    std::vector<PayloadGroup> payloadGroups;
+    std::vector<PayloadGroup> m_PayloadGroups;
 };

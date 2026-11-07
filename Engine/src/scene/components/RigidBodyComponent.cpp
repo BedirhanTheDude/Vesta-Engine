@@ -16,7 +16,7 @@
 #include <physics/PhysicsMaterial.h>
 #include <physics/CollisionShape.h>
 
-// everything the physics solver needs from the entity's other components, mesh is null if it has none
+// everything the physics solver needs from the m_Entity's other components, mesh is null if it has none
 struct RigidBodyContext {
     RigidBody* rb;
     Transform* transform;
@@ -24,13 +24,13 @@ struct RigidBodyContext {
     PhysicsWorld* world;
 };
 
-static bool resolveContext(const Entity& entity, RigidBodyContext& context) {
-    context.rb = resolveComponent<RigidBody>(entity);
-    context.transform = resolveComponent<Transform>(entity);
+static bool resolveContext(const Entity& m_Entity, RigidBodyContext& context) {
+    context.rb = resolveComponent<RigidBody>(m_Entity);
+    context.transform = resolveComponent<Transform>(m_Entity);
     if (!context.rb || !context.transform) return false;
 
-    context.mesh = resolveComponent<MeshData>(entity);
-    context.world = &entity.getScene().getPhysicsWorld();
+    context.mesh = resolveComponent<MeshData>(m_Entity);
+    context.world = &m_Entity.getScene().getPhysicsWorld();
 
     return true;
 }

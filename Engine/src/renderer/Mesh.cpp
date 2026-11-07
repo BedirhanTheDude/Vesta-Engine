@@ -6,39 +6,39 @@
 #include <glm/glm.hpp>
 
 Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices)
-    : vertices(vertices), indices(indices)
+    : m_Vertices(vertices), m_Indices(indices)
     {
-    name = "";
+    m_Name = "";
     setupMesh();
 }
 
 Mesh::~Mesh()
 {
-    if (EBO) glDeleteBuffers(1, &EBO);
-    if (VBO) glDeleteBuffers(1, &VBO);
-    if (VAO) glDeleteVertexArrays(1, &VAO);
+    if (m_EBO) glDeleteBuffers(1, &m_EBO);
+    if (m_VBO) glDeleteBuffers(1, &m_VBO);
+    if (m_VAO) glDeleteVertexArrays(1, &m_VAO);
 }
 
-const std::vector<Vertex>& Mesh::getVertices() const { return vertices; }
-const std::vector<unsigned int>& Mesh::getIndices() const { return indices; }
+const std::vector<Vertex>& Mesh::getVertices() const { return m_Vertices; }
+const std::vector<unsigned int>& Mesh::getIndices() const { return m_Indices; }
 
 void Mesh::setupMesh() {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    glGenVertexArrays(1, &m_VAO);
+    glGenBuffers(1, &m_VBO);
+    glGenBuffers(1, &m_EBO);
 
-    glBindVertexArray(VAO);
+    glBindVertexArray(m_VAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
     glBufferData(GL_ARRAY_BUFFER,
-                 vertices.size() * sizeof(Vertex),
-                 vertices.data(),
+                 m_Vertices.size() * sizeof(Vertex),
+                 m_Vertices.data(),
                  GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 indices.size() * sizeof(unsigned int),
-                 indices.data(),
+                 m_Indices.size() * sizeof(unsigned int),
+                 m_Indices.data(),
                  GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
@@ -58,21 +58,21 @@ void Mesh::setupMesh() {
 
 void Mesh::draw() const
 {
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, static_cast<GLuint>(indices.size()), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(m_VAO);
+    glDrawElements(GL_TRIANGLES, static_cast<GLuint>(m_Indices.size()), GL_UNSIGNED_INT, 0);
 }
 
 glm::vec3 Mesh::computeCentroid() const {
-    if (vertices.empty()) return glm::vec3(0.0f);
+    if (m_Vertices.empty()) return glm::vec3(0.0f);
     glm::vec3 sum(0.0f);
-    for (const auto& v : vertices)
+    for (const auto& v : m_Vertices)
         sum += v.position;
-    return sum / static_cast<float>(vertices.size());
+    return sum / static_cast<float>(m_Vertices.size());
 }
 
 void Mesh::drawSubMesh(int index) const {
-	glBindVertexArray(VAO);
-	const auto& sub = submeshes.at(index);
+	glBindVertexArray(m_VAO);
+	const auto& sub = m_Submeshes.at(index);
 	glDrawElements(GL_TRIANGLES, sub.indexCount, GL_UNSIGNED_INT,
 		(void*)(sub.indexOffset * sizeof(unsigned int)));
 	glBindVertexArray(0);

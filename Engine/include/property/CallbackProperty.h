@@ -59,10 +59,10 @@ public:
 
     void registerCallback(const std::string& name, CallbackPropertyType type, const void* ptr, std::function<void(const void*)> callback = nullptr,
         unsigned int groupID = 0, const std::string& groupName = "defaultGroup", CallbackProperty prop = {}) {
-        if (groupID >= callbackPropertyGroups.size())
-            callbackPropertyGroups.resize(groupID + 1);
+        if (groupID >= m_CallbackPropertyGroups.size())
+            m_CallbackPropertyGroups.resize(groupID + 1);
 
-        CallbackPropertyGroup& group = callbackPropertyGroups[groupID];
+        CallbackPropertyGroup& group = m_CallbackPropertyGroups[groupID];
         if (group.name.empty())
             group.name = camelToWords(groupName);
 
@@ -81,11 +81,11 @@ public:
 
     std::map<unsigned int, CallbackProperty>& getCallbackProperties(unsigned int groupID = 0) {
         static std::map<unsigned int, CallbackProperty> empty;
-        if (groupID < callbackPropertyGroups.size()) return callbackPropertyGroups[groupID].properties;
+        if (groupID < m_CallbackPropertyGroups.size()) return m_CallbackPropertyGroups[groupID].properties;
         return empty;
     }
-    std::vector<CallbackPropertyGroup>& getCallbackPropertyGroups() { return callbackPropertyGroups; }
+    std::vector<CallbackPropertyGroup>& getCallbackPropertyGroups() { return m_CallbackPropertyGroups; }
 
 protected:
-    std::vector<CallbackPropertyGroup> callbackPropertyGroups;
+    std::vector<CallbackPropertyGroup> m_CallbackPropertyGroups;
 };

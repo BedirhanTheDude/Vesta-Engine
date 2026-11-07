@@ -4,7 +4,6 @@
 #include <vector>
 #include <filesystem>
 #include <memory>
-#include <unordered_map>
 
 struct FileNode {
     std::string name;
@@ -23,8 +22,8 @@ public:
     static constexpr const char* payload = "FM_ASSET_PATH";
     static constexpr const char* scriptPayload = "FM_SCRIPT_PATH";
 
-    const std::filesystem::path& getCurrentDirectory() const { return currentDir; }
-    const std::vector<std::string>& getScriptNames() const { return scriptNames; }
+    const std::filesystem::path& getCurrentDirectory() const { return m_CurrentDir; }
+    const std::vector<std::string>& getScriptNames() const { return m_ScriptNames; }
 
 private:
     void drawFolderTree(FileNode& node);
@@ -42,44 +41,40 @@ private:
     void deleteItem(FileNode& node);
     void importAsset(const std::string& srcAbsolutePath);
 
-    unsigned int loadThumbnail(const std::filesystem::path& imagePath);
-    void releaseThumbnails();
+    std::filesystem::path m_RootPath;
+    std::filesystem::path m_CurrentDir;
 
-    std::filesystem::path rootPath;
-    std::filesystem::path currentDir;
+    FileNode m_RootNode;
+    std::vector<FileNode> m_CurrentItems;
 
-    FileNode rootNode;
-    std::vector<FileNode> currentItems;
+    bool m_RenamingActive = false;
+    std::filesystem::path m_RenamingPath;
+    char m_RenameBuffer[256] = {};
 
-    bool renamingActive = false;
-    std::filesystem::path renamingPath;
-    char renameBuffer[256] = {};
+    bool m_DeletePopupTriggered = false;
+    FileNode* m_NodeToBeDeleted = nullptr;
 
-    bool deletePopupTriggered = false;
-    FileNode* nodeToBeDeleted = nullptr;
+    bool m_CreateFolderOpen = false;
+    char m_NewFolderName[128] = "New Folder";
 
-    bool createFolderOpen = false;
-    char newFolderName[128] = "New Folder";
+    bool m_ImportPopupOpen = false;
+    std::filesystem::path m_SelectedPath;
 
-    bool importPopupOpen = false;
-    std::filesystem::path selectedPath;
-    std::unordered_map<std::string, unsigned int> thumbnailCache;
+    float m_ItemSize = 80.0f;
+    float m_RefreshTimer = 0.0f;
+    float m_RefreshInterval = 2.0f;
 
-    float itemSize = 80.0f;
-    float refreshTimer = 0.0f;
-    float refreshInterval = 2.0f;
-
-    std::filesystem::path pendingNavigate;
+    std::filesystem::path m_PendingNavigate;
 
     enum class Tab { Assets, Scripts };
-    Tab activeTab = Tab::Assets;
+    Tab m_ActiveTab = Tab::Assets;
 
-    std::vector<FileNode> scriptItems;
-    std::vector<std::string> scriptNames;
+    std::vector<FileNode> m_ScriptItems;
+    std::vector<std::string> m_ScriptNames;
 
     void refreshScripts();
     void drawScriptsTab();
 
-    bool importScriptPopupOpen = false;
-    static char importScriptPathBuf[512];
+    bool m_ImportScriptPopupOpen = false;
+    static char m_ImportScriptPathBuf[512];
 };

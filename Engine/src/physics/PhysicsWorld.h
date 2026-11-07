@@ -44,20 +44,20 @@ public:
 	void removeActor(PxActor& actor);
 	void cleanShapeCache();
 
-	PxPhysics* getPhysics() const { return gPhysics; }
-	PxScene* getScene() const { return gScene; }
+	PxPhysics* getPhysics() const { return m_GPhysics; }
+	PxScene* getScene() const { return m_GScene; }
 
-	std::shared_ptr<PhysicsMaterial> getDefaultMaterial() { return defaultMaterial; }
+	std::shared_ptr<PhysicsMaterial> getDefaultMaterial() { return m_DefaultMaterial; }
 	std::shared_ptr<CollisionShape> getOrCreateShape(const Mesh* mesh, const glm::vec3& scale, bool forceConvex = false);
 private:
-	PxDefaultAllocator gAllocator;
-	PxDefaultErrorCallback gErrorCallback;
+	PxDefaultAllocator m_GAllocator;
+	PxDefaultErrorCallback m_GErrorCallback;
 
-	PxFoundation* gFoundation = nullptr;
-	PxPhysics* gPhysics = nullptr;
-	PxScene* gScene = nullptr;
-	PxDefaultCpuDispatcher* gDispatcher = nullptr;
+	PxFoundation* m_GFoundation = nullptr;
+	PxPhysics* m_GPhysics = nullptr;
+	PxScene* m_GScene = nullptr;
+	PxDefaultCpuDispatcher* m_GDispatcher = nullptr;
 
-	std::shared_ptr<PhysicsMaterial> defaultMaterial = nullptr;
-	std::unordered_map<ShapeCacheKey, std::shared_ptr<CollisionShape>, ShapeCacheKeyHash> shapeCache;
+	std::shared_ptr<PhysicsMaterial> m_DefaultMaterial = nullptr;
+	std::unordered_map<ShapeCacheKey, std::shared_ptr<CollisionShape>, ShapeCacheKeyHash> m_ShapeCache;
 };

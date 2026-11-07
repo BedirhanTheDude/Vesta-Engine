@@ -52,26 +52,26 @@ namespace ECS {
 		// Lookup by data type, used by the proxies: resolveComponent<Camera>(entity)
 		template<typename T>
 		ComponentPool<T>& get() {
-			if constexpr (std::is_same_v<T, Transform>) return transforms;
-			else if constexpr (std::is_same_v<T, Camera>) return cameras;
-			else if constexpr (std::is_same_v<T, MeshData>) return meshes;
-			else if constexpr (std::is_same_v<T, MaterialData>) return materials;
-			else if constexpr (std::is_same_v<T, DirectionalLight>) return directionalLights;
-			else if constexpr (std::is_same_v<T, PointLight>) return pointLights;
-			else if constexpr (std::is_same_v<T, RigidBody>) return rigidBodies;
+			if constexpr (std::is_same_v<T, Transform>) return m_Transforms;
+			else if constexpr (std::is_same_v<T, Camera>) return m_Cameras;
+			else if constexpr (std::is_same_v<T, MeshData>) return m_Meshes;
+			else if constexpr (std::is_same_v<T, MaterialData>) return m_Materials;
+			else if constexpr (std::is_same_v<T, DirectionalLight>) return m_DirectionalLights;
+			else if constexpr (std::is_same_v<T, PointLight>) return m_PointLights;
+			else if constexpr (std::is_same_v<T, RigidBody>) return m_RigidBodies;
 			else static_assert(!sizeof(T), "No component pool registered for this type");
 		}
 
 	private:
-		ComponentPool<Transform> transforms;
-		ComponentPool<Camera> cameras;
-		ComponentPool<MeshData> meshes;
-		ComponentPool<MaterialData> materials;
-		ComponentPool<DirectionalLight> directionalLights;
-		ComponentPool<PointLight> pointLights;
-		ComponentPool<RigidBody> rigidBodies;
+		ComponentPool<Transform> m_Transforms;
+		ComponentPool<Camera> m_Cameras;
+		ComponentPool<MeshData> m_Meshes;
+		ComponentPool<MaterialData> m_Materials;
+		ComponentPool<DirectionalLight> m_DirectionalLights;
+		ComponentPool<PointLight> m_PointLights;
+		ComponentPool<RigidBody> m_RigidBodies;
 
-		std::unordered_map<uint32_t, IComponentPool*> pools; // proxy UID -> pool above, pointers into this object
-		std::unordered_map<uint32_t, BehaviourPool> behaviourPools; // script UID -> pool, created on first use
+		std::unordered_map<uint32_t, IComponentPool*> m_Pools; // proxy UID -> pool above, pointers into this object
+		std::unordered_map<uint32_t, BehaviourPool> m_BehaviourPools; // script UID -> pool, created on first use
 	};
 }

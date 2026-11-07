@@ -5,39 +5,39 @@
 #include <controller/AssetController.h>
 #include <controller/FileTypeController.h>
 
-#include <imgui.h>
+#include <gui/Thumbnail.h>
 
-#include <glad/glad.h>
-#include <stb_image.h>
+#include <imgui.h>
 
 #include <algorithm>
 #include <iostream>
 #include <cstring>
+#include <cstdint>
 
 void FileManagerPanel::init(const std::filesystem::path& rootPath) {
-    this->rootPath = rootPath;
-    currentDir = this->rootPath;
+    this->m_RootPath = rootPath;
+    m_CurrentDir = this->m_RootPath;
 
     refresh();
     refreshScripts();
 }
 
 void FileManagerPanel::refresh() {
-    renamingActive = false;
-    deletePopupTriggered = false;
-    createFolderOpen = false;
-    importPopupOpen = false;
-    importScriptPopupOpen = false;
-    nodeToBeDeleted = nullptr;
+    m_RenamingActive = false;
+    m_DeletePopupTriggered = false;
+    m_CreateFolderOpen = false;
+    m_ImportPopupOpen = false;
+    m_ImportScriptPopupOpen = false;
+    m_NodeToBeDeleted = nullptr;
 
     // the current directory may have been deleted or renamed from outside
     std::error_code ec;
-    if (!std::filesystem::is_directory(currentDir, ec))
-        currentDir = rootPath;
+    if (!std::filesystem::is_directory(m_CurrentDir, ec))
+        m_CurrentDir = m_RootPath;
 
-    rootNode = buildTree(rootPath);
-    currentItems.clear();
-    for (auto& entry : std::filesystem::directory_iterator(currentDir, ec)) {
+    m_RootNode = buildTree(m_RootPath);
+    m_CurrentItems.clear();
+    for (auto& entry : std::filesystem::directory_iterator(m_CurrentDir, ec)) {
         std::error_code entryEc;
         FileNode n;
         n.path = entry.path();
@@ -47,9 +47,9 @@ void FileManagerPanel::refresh() {
         if (n.isDirectory && FileTypeController::isHiddenDirectory(n.path)) continue;
         if (!n.isDirectory && FileTypeController::isProjectFile(n.path)) continue;
 
-        currentItems.push_back(n);
+        m_CurrentItems.push_back(n);
     }
-    std::sort(currentItems.begin(), currentItems.end(),
+    std::sort(m_CurrentItems.begin(), m_CurrentItems.end(),
         [](const FileNode& a, const FileNode& b) {
             if (a.isDirectory != b.isDirectory) return a.isDirectory > b.isDirectory;
             return a.name < b.name;
@@ -78,35 +78,6 @@ FileNode FileManagerPanel::buildTree(const std::filesystem::path& path, int dept
     return node;
 }
 
-unsigned int FileManagerPanel::loadThumbnail(const std::filesystem::path& imagePath) {
-    std::string key = imagePath.string();
-    auto it = thumbnailCache.find(key);
-    if (it != thumbnailCache.end()) return it->second;
-
-    int w, h, ch;
-    stbi_set_flip_vertically_on_load(false);
-    unsigned char* data = stbi_load(key.c_str(), &w, &h, &ch, 4);
-    if (!data) return 0;
-
-    unsigned int texID = 0;
-    glGenTextures(1, &texID);
-    glBindTexture(GL_TEXTURE_2D, texID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    stbi_image_free(data);
-    thumbnailCache[key] = texID;
-    return texID;
-}
-
-void FileManagerPanel::releaseThumbnails() {
-    for (auto& [k, id] : thumbnailCache)
-        if (id) glDeleteTextures(1, &id);
-    thumbnailCache.clear();
-}
-
 void FileManagerPanel::createFolder(const std::filesystem::path& parent, const std::string& name) {
     std::filesystem::path newDir = parent / name;
     std::error_code ec;
@@ -123,7 +94,7 @@ void FileManagerPanel::renameItem(FileNode& node, const std::string& newName) {
     std::filesystem::rename(node.path, dest, ec);
     if (ec) std::cerr << "Rename failed: " << ec.message() << "\n";
 
-    selectedPath = dest;
+    m_SelectedPath = dest;
     refresh();
 }
 
@@ -136,8 +107,8 @@ void FileManagerPanel::deleteItem(FileNode& node) {
 
     if (ec) std::cerr << "Delete failed: " << ec.message() << "\n";
 
-    if (selectedPath == node.path)
-        selectedPath.clear();
+    if (m_SelectedPath == node.path)
+        m_SelectedPath.clear();
 
     refresh();
 }
@@ -147,7 +118,7 @@ void FileManagerPanel::importAsset(const std::string& srcAbsolutePath) {
     std::error_code existsEc;
     if (!std::filesystem::exists(src, existsEc)) return;
 
-    std::filesystem::path dest = currentDir / src.filename();
+    std::filesystem::path dest = m_CurrentDir / src.filename();
     std::error_code ec;
     std::filesystem::copy_file(src, dest, std::filesystem::copy_options::overwrite_existing, ec);
     if (ec) std::cerr << "Import copy failed: " << ec.message() << "\n";
@@ -155,15 +126,15 @@ void FileManagerPanel::importAsset(const std::string& srcAbsolutePath) {
     refresh();
 }
 
-char FileManagerPanel::importScriptPathBuf[512] = {};
+char FileManagerPanel::m_ImportScriptPathBuf[512] = {};
 
 // scripts can be anywhere in the project, this walks the whole tree (skipping hidden directories)
 void FileManagerPanel::refreshScripts() {
-    scriptItems.clear();
-    scriptNames.clear();
+    m_ScriptItems.clear();
+    m_ScriptNames.clear();
 
     std::error_code ec;
-    std::filesystem::recursive_directory_iterator it(rootPath,
+    std::filesystem::recursive_directory_iterator it(m_RootPath,
         std::filesystem::directory_options::skip_permission_denied, ec);
     const std::filesystem::recursive_directory_iterator end;
 
@@ -186,43 +157,49 @@ void FileManagerPanel::refreshScripts() {
         n.path = entry.path();
         n.name = entry.path().filename().string();
         n.isDirectory = false;
-        scriptItems.push_back(n);
+        m_ScriptItems.push_back(n);
 
         if (extension == ".h")
-            scriptNames.push_back(entry.path().stem().string());
+            m_ScriptNames.push_back(entry.path().stem().string());
     }
 
-    std::sort(scriptItems.begin(), scriptItems.end(),
+    std::sort(m_ScriptItems.begin(), m_ScriptItems.end(),
         [](const FileNode& a, const FileNode& b) { return a.name < b.name; });
-    std::sort(scriptNames.begin(), scriptNames.end());
+    std::sort(m_ScriptNames.begin(), m_ScriptNames.end());
 }
 
 void FileManagerPanel::drawScriptsTab() {
-    if (ImGui::Button("Create Script")) importScriptPopupOpen = true;
+    if (ImGui::Button("Create Script")) m_ImportScriptPopupOpen = true;
     ImGui::SameLine();
     if (ImGui::Button("Refresh##scripts")) refreshScripts();
     ImGui::Separator();
 
-    if (scriptItems.empty()) {
+    if (m_ScriptItems.empty()) {
         ImGui::TextDisabled("No scripts found in the project.");
         ImGui::TextDisabled("Click 'Create Script' to create a new script.");
     }
 
     float panelWidth = ImGui::GetContentRegionAvail().x;
-    int columns = std::max(1, static_cast<int>(panelWidth / (itemSize + 16.0f)));
+    int columns = std::max(1, static_cast<int>(panelWidth / (m_ItemSize + 16.0f)));
     ImGui::Columns(columns, "##scriptgrid", false);
 
-    for (auto& node : scriptItems) {
+    ImVec2 iconSize(m_ItemSize, m_ItemSize);
+    std::filesystem::path scrollPath("resources/images/script.svg");
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.f, 0.f, 0.f, 0.f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.f, 0.f, 0.f, 0.f));
+
+    for (auto& node : m_ScriptItems) {
         ImGui::PushID(node.path.u8string().c_str());
 
-        bool selected = (selectedPath == node.path);
-        if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.59f, 0.98f, 0.35f));
+        uint32_t thumb = Thumbnail::loadThumbnailFromSvg(scrollPath, m_ItemSize, m_ItemSize);
+        if (thumb != UINT_MAX)
+            ImGui::ImageButton("##btn", (ImTextureID)(intptr_t)thumb, iconSize);
+        else
+            ImGui::Button("[SCR]", iconSize);
 
-        ImGui::Button("[SCR]", ImVec2(itemSize, itemSize));
-
-        if (selected) ImGui::PopStyleColor();
-
-        if (ImGui::IsItemClicked()) selectedPath = node.path;
+        if (ImGui::IsItemClicked()) m_SelectedPath = node.path;
 
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
             std::string pathStr = node.path.string();
@@ -251,7 +228,7 @@ void FileManagerPanel::drawScriptsTab() {
 
         std::string display = FileTypeController::truncateForDisplay(node.name);
         float textWidth = ImGui::CalcTextSize(display.c_str()).x;
-        float indent = (itemSize - textWidth) * 0.5f;
+        float indent = (m_ItemSize - textWidth) * 0.5f;
         if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
         ImGui::TextUnformatted(display.c_str());
         ImGui::Spacing();
@@ -259,6 +236,9 @@ void FileManagerPanel::drawScriptsTab() {
         ImGui::PopID();
         ImGui::NextColumn();
     }
+
+    ImGui::PopStyleColor(3);
+
     ImGui::Columns(1);
 }
 
@@ -271,11 +251,11 @@ void FileManagerPanel::show(bool* open) {
 
     if (ImGui::BeginTabBar("##FMTabs")) {
         if (ImGui::BeginTabItem("Assets")) {
-            activeTab = Tab::Assets;
+            m_ActiveTab = Tab::Assets;
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Scripts")) {
-            activeTab = Tab::Scripts;
+            m_ActiveTab = Tab::Scripts;
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -283,18 +263,18 @@ void FileManagerPanel::show(bool* open) {
 
     ImGui::Separator();
 
-    if (importScriptPopupOpen) {
+    if (m_ImportScriptPopupOpen) {
         ImGui::OpenPopup("Import Script##FM");
-        importScriptPopupOpen = false;
+        m_ImportScriptPopupOpen = false;
     }
     if (ImGui::BeginPopupModal("Import Script##FM", nullptr,
         ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Name the script you want to create:");
-        ImGui::InputText("##importscript", importScriptPathBuf, sizeof(importScriptPathBuf));
+        ImGui::InputText("##importscript", m_ImportScriptPathBuf, sizeof(m_ImportScriptPathBuf));
         if (ImGui::Button("Create", ImVec2(120, 0))) {
-            ScriptingController::createNewScript(importScriptPathBuf, currentDir.string());
+            ScriptingController::createNewScript(m_ImportScriptPathBuf, m_CurrentDir.string());
             refresh();
-            memset(importScriptPathBuf, 0, sizeof(importScriptPathBuf));
+            memset(m_ImportScriptPathBuf, 0, sizeof(m_ImportScriptPathBuf));
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -302,7 +282,7 @@ void FileManagerPanel::show(bool* open) {
         ImGui::EndPopup();
     }
 
-    if (activeTab == Tab::Scripts) {
+    if (m_ActiveTab == Tab::Scripts) {
         ImGui::BeginChild("##FMScripts", ImVec2(0, 0), false,
             ImGuiWindowFlags_HorizontalScrollbar);
         drawScriptsTab();
@@ -312,31 +292,32 @@ void FileManagerPanel::show(bool* open) {
         return;
     }
 
-    if (ImGui::Button("Import")) importPopupOpen = true;
+    if (ImGui::Button("Import")) m_ImportPopupOpen = true;
     ImGui::SameLine();
     if (ImGui::Button("New Folder")) {
-        memset(newFolderName, 0, sizeof(newFolderName));
-        strcpy(newFolderName, "New Folder");
-        createFolderOpen = true;
+        memset(m_NewFolderName, 0, sizeof(m_NewFolderName));
+        strcpy(m_NewFolderName, "New Folder");
+        m_CreateFolderOpen = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("Refresh")) refresh();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100.0f);
-    ImGui::SliderFloat("Size", &itemSize, 48.0f, 128.0f);
+    ImGui::SliderFloat("Size", &m_ItemSize, 48.0f, 128.0f);
 
-    ImGui::Separator();
-    drawBreadcrumb();
+    // Never even used this once during testing, so I removed it
+    //ImGui::Separator();
+    //drawBreadcrumb();
     ImGui::Separator();
 
     float treeWidth = 200.0f;
     ImGui::BeginChild("##FMTree", ImVec2(treeWidth, 0), true);
-    drawFolderTree(rootNode);
+    drawFolderTree(m_RootNode);
     ImGui::EndChild();
 
-    if (!pendingNavigate.empty()) {
-        currentDir = pendingNavigate;
-        pendingNavigate.clear();
+    if (!m_PendingNavigate.empty()) {
+        m_CurrentDir = m_PendingNavigate;
+        m_PendingNavigate.clear();
         refresh();
     }
 
@@ -347,16 +328,16 @@ void FileManagerPanel::show(bool* open) {
     drawContentBrowser();
     ImGui::EndChild();
 
-    if (createFolderOpen) {
+    if (m_CreateFolderOpen) {
         ImGui::OpenPopup("Create Folder##FM");
-        createFolderOpen = false;
+        m_CreateFolderOpen = false;
     }
     if (ImGui::BeginPopupModal("Create Folder##FM", nullptr,
         ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Folder name:");
-        ImGui::InputText("##foldername", newFolderName, sizeof(newFolderName));
+        ImGui::InputText("##foldername", m_NewFolderName, sizeof(m_NewFolderName));
         if (ImGui::Button("Create", ImVec2(120, 0))) {
-            createFolder(currentDir, newFolderName);
+            createFolder(m_CurrentDir, m_NewFolderName);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -364,9 +345,9 @@ void FileManagerPanel::show(bool* open) {
         ImGui::EndPopup();
     }
 
-    if (importPopupOpen) {
+    if (m_ImportPopupOpen) {
         ImGui::OpenPopup("Import Asset##FM");
-        importPopupOpen = false;
+        m_ImportPopupOpen = false;
     }
     static char importPath[512] = {};
     if (ImGui::BeginPopupModal("Import Asset##FM", nullptr,
@@ -386,12 +367,13 @@ void FileManagerPanel::show(bool* open) {
     ImGui::End();
 }
 
+// Maybe useful but removed to reduce cluttering
 void FileManagerPanel::drawBreadcrumb() {
     std::vector<std::filesystem::path> crumbs;
-    std::filesystem::path cur = currentDir;
-    while (cur != rootPath.parent_path() && cur != cur.parent_path()) {
+    std::filesystem::path cur = m_CurrentDir;
+    while (cur != m_RootPath.parent_path() && cur != cur.parent_path()) {
         crumbs.push_back(cur);
-        if (cur == rootPath) break;
+        if (cur == m_RootPath) break;
         cur = cur.parent_path();
     }
     std::reverse(crumbs.begin(), crumbs.end());
@@ -404,7 +386,7 @@ void FileManagerPanel::drawBreadcrumb() {
         }
         std::string label = crumbs[i].filename().string() + "##bc" + std::to_string(i);
         if (ImGui::SmallButton(label.c_str())) {
-            currentDir = crumbs[i];
+            m_CurrentDir = crumbs[i];
             refresh();
         }
     }
@@ -421,17 +403,17 @@ void FileManagerPanel::drawFolderTree(FileNode& node) {
     if (node.children.empty())
         flags |= ImGuiTreeNodeFlags_Leaf;
 
-    if (node.path == currentDir)
+    if (node.path == m_CurrentDir)
         flags |= ImGuiTreeNodeFlags_Selected;
 
-    if (node.path == rootPath)
+    if (node.path == m_RootPath)
         flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
     std::string label = "[DIR] " + node.name + "##tree" + node.path.string();
     bool open = ImGui::TreeNodeEx(label.c_str(), flags);
 
     if (ImGui::IsItemClicked()) {
-        pendingNavigate = node.path;
+        m_PendingNavigate = node.path;
     }
 
     if (open) {
@@ -454,11 +436,11 @@ void FileManagerPanel::drawContentBrowser() {
     }
 
     float panelWidth = ImGui::GetContentRegionAvail().x;
-    int columns = std::max(1, static_cast<int>(panelWidth / (itemSize + 16.0f)));
+    int columns = std::max(1, static_cast<int>(panelWidth / (m_ItemSize + 16.0f)));
 
     ImGui::Columns(columns, "##fmgrid", false);
 
-    for (auto& node : currentItems) {
+    for (auto& node : m_CurrentItems) {
         drawItem(node);
         ImGui::NextColumn();
     }
@@ -467,50 +449,50 @@ void FileManagerPanel::drawContentBrowser() {
 }
 
 void FileManagerPanel::drawItem(FileNode& node) {
-    bool selected = (selectedPath == node.path);
+    bool selected = (m_SelectedPath == node.path);
 
     ImGui::PushID(node.path.u8string().c_str());
 
-    if (deletePopupTriggered) {
-        if (nodeToBeDeleted && nodeToBeDeleted == &node) {
-            ImGui::OpenPopup(("Delete?##" + nodeToBeDeleted->path.string()).c_str());
-            deletePopupTriggered = false;
+    if (m_DeletePopupTriggered) {
+        if (m_NodeToBeDeleted && m_NodeToBeDeleted == &node) {
+            ImGui::OpenPopup(("Delete?##" + m_NodeToBeDeleted->path.string()).c_str());
+            m_DeletePopupTriggered = false;
         }
     }
 
-    if (nodeToBeDeleted && ImGui::BeginPopupModal(("Delete?##" + nodeToBeDeleted->path.string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Delete \"%s\"?\nThis cannot be undone.", nodeToBeDeleted->name.c_str());
+    if (m_NodeToBeDeleted && ImGui::BeginPopupModal(("Delete?##" + m_NodeToBeDeleted->path.string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Delete \"%s\"?\nThis cannot be undone.", m_NodeToBeDeleted->name.c_str());
         ImGui::Separator();
 
         if (ImGui::Button("Delete", ImVec2(120, 0))) {
-            deleteItem(*nodeToBeDeleted);
-            nodeToBeDeleted = nullptr;
+            deleteItem(*m_NodeToBeDeleted);
+            m_NodeToBeDeleted = nullptr;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0))) {
-            nodeToBeDeleted = nullptr;
+            m_NodeToBeDeleted = nullptr;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }
 
-    if (renamingActive && renamingPath == node.path) {
-        ImGui::SetNextItemWidth(itemSize);
-        if (ImGui::InputText("##rename", renameBuffer, sizeof(renameBuffer),
+    if (m_RenamingActive && m_RenamingPath == node.path) {
+        ImGui::SetNextItemWidth(m_ItemSize);
+        if (ImGui::InputText("##rename", m_RenameBuffer, sizeof(m_RenameBuffer),
             ImGuiInputTextFlags_EnterReturnsTrue |
             ImGuiInputTextFlags_AutoSelectAll)) {
-            renameItem(node, std::string(renameBuffer));
-            renamingActive = false;
+            renameItem(node, std::string(m_RenameBuffer));
+            m_RenamingActive = false;
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            renamingActive = false;
+            m_RenamingActive = false;
         }
         ImGui::PopID();
         return;
     }
 
-    ImVec2 iconSize(itemSize, itemSize);
+    ImVec2 iconSize(m_ItemSize, m_ItemSize);
 
     if (selected) {
         ImVec4 selColor(0.26f, 0.59f, 0.98f, 0.35f);
@@ -519,8 +501,8 @@ void FileManagerPanel::drawItem(FileNode& node) {
 
     bool clicked = false;
     if (FileTypeController::isImageFile(node.path)) {
-        unsigned int thumb = loadThumbnail(node.path);
-        if (thumb) {
+        uint32_t thumb = Thumbnail::loadThumbnailFromImage(node.path);
+        if (thumb != UINT_MAX) {
             clicked = ImGui::ImageButton(
                 ("##btn" + node.path.string()).c_str(),
                 (ImTextureID)(intptr_t)thumb,
@@ -541,12 +523,12 @@ void FileManagerPanel::drawItem(FileNode& node) {
     if (selected) ImGui::PopStyleColor();
 
     if (clicked || ImGui::IsItemClicked()) {
-        selectedPath = node.path;
+        m_SelectedPath = node.path;
     }
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (node.isDirectory) {
-            pendingNavigate = node.path;
+            m_PendingNavigate = node.path;
         }
         else if (FileTypeController::isSceneFile(node.path)) {
             SceneController::openScene(node.path);
@@ -564,7 +546,7 @@ void FileManagerPanel::drawItem(FileNode& node) {
 
     std::string display = FileTypeController::truncateForDisplay(node.name);
     float textWidth = ImGui::CalcTextSize(display.c_str()).x;
-    float indent = (itemSize - textWidth) * 0.5f;
+    float indent = (m_ItemSize - textWidth) * 0.5f;
     if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
     ImGui::TextUnformatted(display.c_str());
 
@@ -577,12 +559,12 @@ void FileManagerPanel::drawContextMenuBackground() {
         ImGuiPopupFlags_MouseButtonRight |
         ImGuiPopupFlags_NoOpenOverItems)) {
         if (ImGui::MenuItem("New Folder")) {
-            memset(newFolderName, 0, sizeof(newFolderName));
-            strcpy(newFolderName, "New Folder");
-            createFolderOpen = true;
+            memset(m_NewFolderName, 0, sizeof(m_NewFolderName));
+            strcpy(m_NewFolderName, "New Folder");
+            m_CreateFolderOpen = true;
         }
-        if (ImGui::MenuItem("Create Script")) importScriptPopupOpen = true;
-        if (ImGui::MenuItem("Import Asset...")) importPopupOpen = true;
+        if (ImGui::MenuItem("Create Script")) m_ImportScriptPopupOpen = true;
+        if (ImGui::MenuItem("Import Asset...")) m_ImportPopupOpen = true;
         if (ImGui::MenuItem("Refresh"))         refresh();
         ImGui::EndPopup();
     }
@@ -597,7 +579,7 @@ void FileManagerPanel::drawContextMenuItem(FileNode& node) {
 
         if (node.isDirectory) {
             if (ImGui::MenuItem("Open")) {
-                pendingNavigate = node.path;
+                m_PendingNavigate = node.path;
             }
         }
         else if (FileTypeController::isSceneFile(node.path)) {
@@ -620,12 +602,12 @@ void FileManagerPanel::drawContextMenuItem(FileNode& node) {
         ImGui::Separator();
 
         if (ImGui::MenuItem("Rename")) {
-            renamingActive = true;
-            renamingPath = node.path;
+            m_RenamingActive = true;
+            m_RenamingPath = node.path;
             std::string stem = node.isDirectory
                 ? node.name
                 : node.path.stem().string();
-            strncpy(renameBuffer, stem.c_str(), sizeof(renameBuffer) - 1);
+            strncpy(m_RenameBuffer, stem.c_str(), sizeof(m_RenameBuffer) - 1);
         }
 
         if (ImGui::MenuItem("Show in Explorer")) {
@@ -636,8 +618,8 @@ void FileManagerPanel::drawContextMenuItem(FileNode& node) {
         ImGui::Separator();
 
         if (ImGui::MenuItem("Delete")) {
-            deletePopupTriggered = true;
-            nodeToBeDeleted = &node;
+            m_DeletePopupTriggered = true;
+            m_NodeToBeDeleted = &node;
         }
 
         ImGui::EndPopup();

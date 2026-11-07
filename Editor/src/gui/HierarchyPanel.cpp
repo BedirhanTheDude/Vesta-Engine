@@ -13,11 +13,9 @@
 #include <cstring>
 #include <string>
 
-const char* HierarchyPanel::DND_ID = "HIERARCHY_ENTITY";
+const char* HierarchyPanel::m_DND_ID = "HIERARCHY_ENTITY";
 
-void HierarchyPanel::drawNode(
-    const Entity& entity,
-    uint32_t selectedEntityID)
+void HierarchyPanel::drawNode(const Entity& entity, uint32_t selectedEntityID, bool* pasteEntityFlag)
 {
     if (!entity.isAlive())
         return;
@@ -41,24 +39,24 @@ void HierarchyPanel::drawNode(
 
     ImGui::PushID(static_cast<int>(entityID));
 
-    if (renamingEntityID == static_cast<int64_t>(entityID)) {
+    if (m_RenamingEntityID == static_cast<int64_t>(entityID)) {
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
 
         if (ImGui::InputText(
             "##rename",
-            renameBuffer,
-            sizeof(renameBuffer),
+            m_RenameBuffer,
+            sizeof(m_RenameBuffer),
             ImGuiInputTextFlags_EnterReturnsTrue |
             ImGuiInputTextFlags_AutoSelectAll))
         {
-            if (renameBuffer[0] != '\0')
-                entity.setName(renameBuffer);
+            if (m_RenameBuffer[0] != '\0')
+                entity.setName(m_RenameBuffer);
 
-            renamingEntityID = -1;
+            m_RenamingEntityID = -1;
         }
 
         if (ImGui::IsKeyPressed(ImGuiKey_Escape))
-            renamingEntityID = -1;
+            m_RenamingEntityID = -1;
 
         ImGui::PopID();
         return;
@@ -81,7 +79,7 @@ void HierarchyPanel::drawNode(
         ImGuiDragDropFlags_SourceAllowNullID))
     {
         ImGui::SetDragDropPayload(
-            DND_ID,
+            m_DND_ID,
             &entityID,
             sizeof(entityID)
         );
@@ -93,7 +91,7 @@ void HierarchyPanel::drawNode(
 
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payload =
-            ImGui::AcceptDragDropPayload(DND_ID))
+            ImGui::AcceptDragDropPayload(m_DND_ID))
         {
             const unsigned int draggedID =
                 *static_cast<const unsigned int*>(payload->Data);
@@ -115,15 +113,15 @@ void HierarchyPanel::drawNode(
     if (ImGui::BeginPopupContextItem("##entityCtx")) {
 
         if (ImGui::MenuItem("Rename")) {
-            renamingEntityID = static_cast<int64_t>(entityID);
+            m_RenamingEntityID = static_cast<int64_t>(entityID);
 
             std::strncpy(
-                renameBuffer,
+                m_RenameBuffer,
                 entityName.c_str(),
-                sizeof(renameBuffer) - 1
+                sizeof(m_RenameBuffer) - 1
             );
 
-            renameBuffer[sizeof(renameBuffer) - 1] = '\0';
+            m_RenameBuffer[sizeof(m_RenameBuffer) - 1] = '\0';
         }
 
         if (transform.getParent().isValid()) {
@@ -136,7 +134,7 @@ void HierarchyPanel::drawNode(
 
         if (ImGui::MenuItem("Duplicate")) {
             EntityController::copyEntity(entityID);
-            EntityController::pasteEntity();
+            if (pasteEntityFlag) *pasteEntityFlag = true;
         }
 
         ImGui::Separator();
@@ -198,8 +196,8 @@ void HierarchyPanel::show(bool* open)
     const std::vector<Entity>& entities =
         scene->getEntities();
 
+    bool pasteEntityFlag = false;
     for (const Entity& entity : entities) {
-
         if (!entity.isAlive())
             continue;
 
@@ -209,8 +207,11 @@ void HierarchyPanel::show(bool* open)
         if (parent.isValid())
             continue;
 
-        drawNode(entity, selectedEntityID);
+        drawNode(entity, selectedEntityID, &pasteEntityFlag);
     }
+
+    if (pasteEntityFlag)
+        EntityController::pasteEntity();
 
     if (ImGui::IsWindowHovered(
         ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
@@ -237,7 +238,7 @@ void HierarchyPanel::show(bool* open)
     if (ImGui::BeginDragDropTarget()) {
 
         if (const ImGuiPayload* payload =
-            ImGui::AcceptDragDropPayload(DND_ID))
+            ImGui::AcceptDragDropPayload(m_DND_ID))
         {
             const unsigned int draggedID =
                 *static_cast<const unsigned int*>(payload->Data);

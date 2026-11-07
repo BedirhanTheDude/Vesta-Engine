@@ -21,7 +21,8 @@ namespace ScriptingController {
 			// lock the Scene so it doesn't try to access unloaded Scripts
 			std::lock_guard<std::mutex> lock(sceneMutex);
 
-			ScriptCompiler::reloadScripts(*Application::getCurrentScene());
+			Scene* scene = Application::getCurrentScene();
+			ScriptCompiler::reloadScripts(scene);
 		}
 	}
 

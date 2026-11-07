@@ -12,55 +12,55 @@
 
 namespace ECS {
 	ComponentPoolRegistry::ComponentPoolRegistry() {
-		pools[componentTypeUID<TransformComponent>()] = &transforms;
-		pools[componentTypeUID<CameraComponent>()] = &cameras;
-		pools[componentTypeUID<MeshComponent>()] = &meshes;
-		pools[componentTypeUID<MaterialComponent>()] = &materials;
-		pools[componentTypeUID<DirectionalLightComponent>()] = &directionalLights;
-		pools[componentTypeUID<PointLightComponent>()] = &pointLights;
-		pools[componentTypeUID<RigidBodyComponent>()] = &rigidBodies;
+		m_Pools[componentTypeUID<TransformComponent>()] = &m_Transforms;
+		m_Pools[componentTypeUID<CameraComponent>()] = &m_Cameras;
+		m_Pools[componentTypeUID<MeshComponent>()] = &m_Meshes;
+		m_Pools[componentTypeUID<MaterialComponent>()] = &m_Materials;
+		m_Pools[componentTypeUID<DirectionalLightComponent>()] = &m_DirectionalLights;
+		m_Pools[componentTypeUID<PointLightComponent>()] = &m_PointLights;
+		m_Pools[componentTypeUID<RigidBodyComponent>()] = &m_RigidBodies;
 	}
 
 	ComponentPoolRegistry::~ComponentPoolRegistry() = default;
 
 	void ComponentPoolRegistry::reset() {
-		for (auto& [UID, pool] : pools)
+		for (auto& [UID, pool] : m_Pools)
 			pool->reset();
 
-		behaviourPools.clear();
+		m_BehaviourPools.clear();
 	}
 
 	void ComponentPoolRegistry::removeEntityComponents(const EntityHandle& handle) {
-		for (auto& [UID, pool] : pools)
+		for (auto& [UID, pool] : m_Pools)
 			pool->remove(handle);
 
-		for (auto& [UID, pool] : behaviourPools)
+		for (auto& [UID, pool] : m_BehaviourPools)
 			pool.remove(handle);
 	}
 
 	IComponentPool* ComponentPoolRegistry::getPool(uint32_t UID) {
-		auto it = pools.find(UID);
-		return it != pools.end() ? it->second : nullptr;
+		auto it = m_Pools.find(UID);
+		return it != m_Pools.end() ? it->second : nullptr;
 	}
 
 	ComponentPoolRegistry::BehaviourPool* ComponentPoolRegistry::getBehaviourPool(uint32_t UID) {
-		auto it = behaviourPools.find(UID);
-		return it != behaviourPools.end() ? &it->second : nullptr;
+		auto it = m_BehaviourPools.find(UID);
+		return it != m_BehaviourPools.end() ? &it->second : nullptr;
 	}
 
 	ComponentPoolRegistry::BehaviourPool& ComponentPoolRegistry::getOrCreateBehaviourPool(uint32_t UID) {
-		return behaviourPools[UID];
+		return m_BehaviourPools[UID];
 	}
 
 	std::unordered_map<uint32_t, ComponentPoolRegistry::BehaviourPool>& ComponentPoolRegistry::getBehaviourPools() {
-		return behaviourPools;
+		return m_BehaviourPools;
 	}
 
-	ComponentPool<Transform>& ComponentPoolRegistry::getTransforms() { return transforms; }
-	ComponentPool<Camera>& ComponentPoolRegistry::getCameras() { return cameras; }
-	ComponentPool<MeshData>& ComponentPoolRegistry::getMeshes() { return meshes; }
-	ComponentPool<MaterialData>& ComponentPoolRegistry::getMaterials() { return materials; }
-	ComponentPool<DirectionalLight>& ComponentPoolRegistry::getDirectionalLights() { return directionalLights; }
-	ComponentPool<PointLight>& ComponentPoolRegistry::getPointLights() { return pointLights; }
-	ComponentPool<RigidBody>& ComponentPoolRegistry::getRigidBodies() { return rigidBodies; }
+	ComponentPool<Transform>& ComponentPoolRegistry::getTransforms() { return m_Transforms; }
+	ComponentPool<Camera>& ComponentPoolRegistry::getCameras() { return m_Cameras; }
+	ComponentPool<MeshData>& ComponentPoolRegistry::getMeshes() { return m_Meshes; }
+	ComponentPool<MaterialData>& ComponentPoolRegistry::getMaterials() { return m_Materials; }
+	ComponentPool<DirectionalLight>& ComponentPoolRegistry::getDirectionalLights() { return m_DirectionalLights; }
+	ComponentPool<PointLight>& ComponentPoolRegistry::getPointLights() { return m_PointLights; }
+	ComponentPool<RigidBody>& ComponentPoolRegistry::getRigidBodies() { return m_RigidBodies; }
 }

@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <cstdio>
 
-bool ComponentFactory::scriptCacheValid = false;
+bool ComponentFactory::m_ScriptCacheValid = false;
 
 // single definition (this TU is compiled only into Engine.dll), so the UID->name map
 // is shared by every module that calls it: REGISTER/END_SCRIPT write it, the UI reads it.
@@ -26,13 +26,13 @@ void ComponentFactory::registerBuiltIn(const std::string& name, Creator creator,
 
 void ComponentFactory::registerScript(const std::string& name, Creator creator, ComponentOps ops) {
     ComponentFactory::getScriptRegistry()[name] = { std::move(creator), ops };
-    scriptCacheValid = false;
+    m_ScriptCacheValid = false;
 }
 
 // out of line so the registry is always Engine.dll's single copy
 void ComponentFactory::clearScriptRegistry() {
     getScriptRegistry().clear();
-    scriptCacheValid = false;
+    m_ScriptCacheValid = false;
 }
 
 void ComponentFactory::create(const std::string& name, Entity& entity, const Archive& arch) {
@@ -152,12 +152,12 @@ const std::vector<std::string>& ComponentFactory::getBuiltInNames() {
 const std::vector<std::string>& ComponentFactory::getScriptNames() {
     static std::vector<std::string> names;
 
-    if (scriptCacheValid) return names;
+    if (m_ScriptCacheValid) return names;
 
     names.clear();
     for (const auto& [name, entry] : getScriptRegistry())
         names.push_back(name);
 
-    scriptCacheValid = true;
+    m_ScriptCacheValid = true;
     return names;
 }

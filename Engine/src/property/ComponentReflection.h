@@ -9,9 +9,9 @@ class Entity;
 class ReflectedComponent : public PropertyHolder, public CallbackPropertyHolder, public PayloadHolder {
 public:
 	void clear() {
-		propertyGroups.clear();
-		callbackPropertyGroups.clear();
-		payloadGroups.clear();
+		m_PropertyGroups.clear();
+		m_CallbackPropertyGroups.clear();
+		m_PayloadGroups.clear();
 		fingerprint.clear();
 	}
 

@@ -91,21 +91,27 @@ void ScriptCompiler::unloadDLL(HMODULE handle) {
 HMODULE ScriptCompiler::getCurrentDLLHandle() { return currentDLLHandle; }
 
 // NOTE: Cannot run concurrently with Scene update
-HMODULE ScriptCompiler::reloadScripts(Scene& scene) {
-	ScriptCache::saveScriptState(scene);
-	ScriptSystem::clearScripts(scene);
+HMODULE ScriptCompiler::reloadScripts(Scene* scene) {
+
+	if (scene) {
+		ScriptCache::saveScriptState(*scene);
+		ScriptSystem::clearScripts(*scene);
+	}
+
 	ComponentFactory::clearScriptRegistry();
 
 	ScriptCompiler::unloadDLL(ScriptCompiler::getCurrentDLLHandle());
 	ScriptLoader::replaceOldDLLFile(); // on failure the old DLL is still there and gets loaded again
 
 	ScriptCompiler::loadDLL(); // static lambdas reinitialize the script registry
-	ScriptCache::loadScriptState(scene);
+	
+	if (scene)
+		ScriptCache::loadScriptState(*scene);
 
 	return currentDLLHandle;
 }
 
-void ScriptCompiler::poll(float dt, Scene& scene) {
+void ScriptCompiler::poll(float dt, Scene* scene) {
 	if (!pollingEnabled) return;
 
 	if (!Project::isOpen()) return;

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <system_error>
+#include <climits>
 
 #include <core/Project.h>
 
@@ -15,14 +16,14 @@
 #include <renderer/LoadedModel.h>
 #include <renderer/ObjLoader.h>
 
-std::unordered_map<std::string, std::shared_ptr<Mesh>> AssetManager::meshes;
-std::unordered_map<std::string, LoadedModel> AssetManager::models;
-std::unordered_map<std::string, std::shared_ptr<ShaderProgram>> AssetManager::shaders;
-std::unordered_map<std::string, std::shared_ptr<Texture>> AssetManager::textures;
+std::unordered_map<std::string, std::shared_ptr<Mesh>> AssetManager::m_Meshes;
+std::unordered_map<std::string, LoadedModel> AssetManager::m_Models;
+std::unordered_map<std::string, std::shared_ptr<ShaderProgram>> AssetManager::m_Shaders;
+std::unordered_map<std::string, std::shared_ptr<Texture>> AssetManager::m_Textures;
 
 bool AssetManager::loadMesh(const std::string& name) {
-    auto it = meshes.find(name);
-    if (it != meshes.end()) return true; // already exists
+    auto it = m_Meshes.find(name);
+    if (it != m_Meshes.end()) return true; // already exists
 
     std::shared_ptr<Mesh> mesh;
 
@@ -37,7 +38,7 @@ bool AssetManager::loadMesh(const std::string& name) {
 
     if (mesh) {
         mesh->setName(name);
-        meshes[name] = mesh;
+        m_Meshes[name] = mesh;
         return true;
     }
     else return false;
@@ -74,8 +75,8 @@ static bool resolveShaderBasePath(const std::string& name, std::filesystem::path
 }
 
 bool AssetManager::loadShader(const std::string& name) {
-    auto it = shaders.find(name);
-    if (it != shaders.end()) return true;
+    auto it = m_Shaders.find(name);
+    if (it != m_Shaders.end()) return true;
 
     std::filesystem::path basePath;
     if (!resolveShaderBasePath(name, basePath)) {
@@ -84,13 +85,13 @@ bool AssetManager::loadShader(const std::string& name) {
     }
 
     auto shader = std::make_shared<ShaderProgram>(name, basePath);
-    shaders[name] = shader;
+    m_Shaders[name] = shader;
     return true;
 }
 
 bool AssetManager::loadTexture(const std::string& name) {
-    auto it = textures.find(name);
-    if (it != textures.end()) return true;
+    auto it = m_Textures.find(name);
+    if (it != m_Textures.end()) return true;
 
     std::filesystem::path filePath;
     if (!Project::resolve(name, filePath)) {
@@ -102,20 +103,20 @@ bool AssetManager::loadTexture(const std::string& name) {
     if (!tex->isLoaded()) return false;
 
     tex->setName(name);
-    textures[name] = tex;
+    m_Textures[name] = tex;
     return true;
 }
 
 bool AssetManager::loadModel(const std::string& name) {
-    auto it = models.find(name);
-    if (it != models.end()) return true;
+    auto it = m_Models.find(name);
+    if (it != m_Models.end()) return true;
 
     LoadedModel model = ObjLoader::loadModel(name);
 
     if (model.mesh) {
         model.mesh->setName(name);
-        models[name] = model;
-        meshes[name] = model.mesh;
+        m_Models[name] = model;
+        m_Meshes[name] = model.mesh;
         return true;
     }
     else return false;
@@ -124,34 +125,34 @@ bool AssetManager::loadModel(const std::string& name) {
 std::shared_ptr<Mesh> AssetManager::getMesh(const std::string& name) {
     bool loaded = loadMesh(name);
     
-    if (loaded) return meshes[name];
+    if (loaded) return m_Meshes[name];
     else return nullptr;
 }
 
 std::shared_ptr<ShaderProgram> AssetManager::getShader(const std::string& name) {
     bool loaded = loadShader(name);
 
-    if (loaded) return shaders[name];
+    if (loaded) return m_Shaders[name];
     else return nullptr;
 }
 
 std::shared_ptr<Texture> AssetManager::getTexture(const std::string& name) {
     bool loaded = loadTexture(name);
 
-    if (loaded) return textures[name];
+    if (loaded) return m_Textures[name];
     else return nullptr;
 }
 
 LoadedModel AssetManager::getModel(const std::string& name) {
     bool loaded = loadModel(name);
 
-    if (loaded) return models[name];
+    if (loaded) return m_Models[name];
     else return {};
 }
 
 void AssetManager::clear() {
-    meshes.clear();
-    models.clear();
-    shaders.clear();
-    textures.clear();
+    m_Meshes.clear();
+    m_Models.clear();
+    m_Shaders.clear();
+    m_Textures.clear();
 }

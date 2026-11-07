@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility/Hash.h>
+
 #include <string>
 #include <typeinfo>
 
@@ -13,15 +15,6 @@ struct ComponentTypeInfo {
 	static inline std::string name = "";
 };
 
-constexpr static unsigned int hashComponentName(const char* str) {
-	unsigned int hash = 2166136261u;
-	while (*str) {
-		hash ^= static_cast<unsigned int>(*str++);
-		hash *= 16777619u;
-	}
-	return hash;
-}
-
 // clean the name MSVC type_info::name() returns
 inline std::string cleanComponentTypeName(const char* raw) {
 	std::string s = raw;
@@ -33,7 +26,7 @@ inline std::string cleanComponentTypeName(const char* raw) {
 // derives the name from the compiler's RTTI
 template<typename T>
 unsigned int componentTypeUID() {
-	static unsigned int id = hashComponentName(cleanComponentTypeName(typeid(T).name()).c_str());
+	static unsigned int id = Hash::hashString(cleanComponentTypeName(typeid(T).name()).c_str());
 	return id;
 }
 
@@ -45,5 +38,5 @@ inline std::string componentTypeUIDToString(unsigned int UID) {
 // UID for a component known only by its registered name (e.g. "MeshComponent").
 // Matches componentTypeUID<T>() because both hash the same registered name string.
 inline unsigned int componentNameToUID(const std::string& name) {
-	return hashComponentName(name.c_str());
+	return Hash::hashString(name.c_str());
 }

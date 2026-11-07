@@ -11,21 +11,21 @@ StaticPhysicsBody::StaticPhysicsBody(PhysicsWorld* world, const glm::vec3& pos,
 	std::shared_ptr<CollisionShape> shape, const glm::vec3& scale) : PhysicsBody(world, mat, shape) {
 	
 	PxPhysics* physics = world->getPhysics();
-	PxMaterial* pxMat = this->mat->getOrCreate();
+	PxMaterial* pxMat = this->m_Mat->getOrCreate();
 
 	PxTransform pxTransform(toPx(pos), toPx(rot));
 
-	actor = physics->createRigidStatic(pxTransform);
-	PxShape* pxShape = shape->getOrCreatePxShape(world, this->mat.get(), scale);
+	m_Actor = physics->createRigidStatic(pxTransform);
+	PxShape* pxShape = shape->getOrCreatePxShape(world, this->m_Mat.get(), scale);
 	if (!pxShape) {
 		printf("Failed to create shape!\n");
 		return;
 	}
-	actor->attachShape(*pxShape);
+	m_Actor->attachShape(*pxShape);
 
-	world->addActor(*actor);
+	world->addActor(*m_Actor);
 }
 
 void StaticPhysicsBody::setGlobalPose(const glm::vec3& pos, const glm::quat& rot) {
-	actor->setGlobalPose(PxTransform(toPx(pos), toPx(rot)), false);
+	m_Actor->setGlobalPose(PxTransform(toPx(pos), toPx(rot)), false);
 }

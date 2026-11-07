@@ -74,12 +74,12 @@ private:
     static int toGLFW(Key key);
     static int toGLFW(MouseButton button);
 
-    static struct GLFWwindow* window;
-    static bool currentKeys[];
-    static bool previousKeys[];
-    static bool currentMouse[];
-    static bool previousMouse[];
-    static glm::vec2 mousePos;
-    static glm::vec2 lastMousePos;
-    static std::string textBuffer;
+    static struct GLFWwindow* m_Window;
+    static bool m_CurrentKeys[];
+    static bool m_PreviousKeys[];
+    static bool m_CurrentMouse[];
+    static bool m_PreviousMouse[];
+    static glm::vec2 m_MousePos;
+    static glm::vec2 m_LastMousePos;
+    static std::string m_TextBuffer;
 };
