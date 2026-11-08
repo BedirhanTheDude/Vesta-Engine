@@ -80,6 +80,7 @@ set(CORE_SRC
 set(ECS_SRC
     Engine/src/ecs/EntityManager.cpp
     Engine/src/ecs/ComponentPoolRegistry.cpp
+    Engine/src/ecs/ScriptPool.cpp
 )
 
 set(PROPERTY_SRC

@@ -1,10 +1,13 @@
 #include <scene/components/ComponentFactory.h>
 
+#include "ComponentFactory.inl"
+
 #include <persistance/Archive.h>
 #include <scene/Entity.h>
 
 #include <unordered_map>
 #include <cstdio>
+#include <string>
 
 bool ComponentFactory::m_ScriptCacheValid = false;
 
@@ -24,8 +27,8 @@ void ComponentFactory::registerBuiltIn(const std::string& name, Creator creator,
     ComponentFactory::getBuiltInRegistry()[name] = { std::move(creator), ops };
 }
 
-void ComponentFactory::registerScript(const std::string& name, Creator creator, ComponentOps ops) {
-    ComponentFactory::getScriptRegistry()[name] = { std::move(creator), ops };
+void ComponentFactory::registerScript(const std::string& name, Creator creator, ComponentOps ops, ScriptTypeInfo typeInfo) {
+    ComponentFactory::getScriptRegistry()[name] = { std::move(creator), ops, std::move(typeInfo) };
     m_ScriptCacheValid = false;
 }
 
@@ -68,73 +71,29 @@ void ComponentFactory::fillExistingComponent(Entity& entity, const Archive& arch
     }
 }
 
-const ComponentFactory::Entry* ComponentFactory::findEntry(unsigned int UID) {
-    std::string name = __componentTypeUIDToString(UID);
-    if (name.empty()) return nullptr;
-
-    auto& builtInRegistry = getBuiltInRegistry();
-    auto bit = builtInRegistry.find(name);
-    if (bit != builtInRegistry.end()) return &bit->second;
-
-    auto& scriptRegistry = getScriptRegistry();
-    auto sit = scriptRegistry.find(name);
-    if (sit != scriptRegistry.end()) return &sit->second;
-
-    return nullptr;
-}
-
 void ComponentFactory::remove(unsigned int UID, Entity& entity) {
-    const Entry* entry = findEntry(UID);
-    if (!entry) return;
+    const BuiltInEntry* entry = findEntry(UID, getBuiltInRegistry());
+    if (entry) { entry->ops.remove(entity); return; }
 
-    entry->ops.remove(entity);
+    const ScriptEntry* sentry = findEntry(UID, getScriptRegistry());
+    if (sentry) sentry->ops.remove(entity);
 }
 
 void ComponentFactory::serializeEntity(const Entity& entity, Archive& arch) {
-    auto serializeGroup = [&](const std::map<std::string, Entry>& registry) {
-        for (const auto& [name, entry] : registry) {
-            Archive cj;
-            if (!entry.ops.serialize(entity, cj)) continue;
-
-            cj.set("type", name);
-            arch.append("components", std::move(cj));
-        }
-    };
-
-    serializeGroup(getBuiltInRegistry());
-    serializeGroup(getScriptRegistry());
+    serializeComponents(entity, arch, getBuiltInRegistry());
+    serializeComponents(entity, arch, getScriptRegistry());
 }
 
 void ComponentFactory::serializeComponent(const Entity& entity, const std::string& componentName, Archive& arch) {
-    auto trySerialize = [&](const std::map<std::string, Entry>& registry) -> bool {
-        for (const auto& [name, entry] : registry) {
-            if (name != componentName) continue;
-
-            if (entry.ops.serialize(entity, arch)) {
-                arch.set("type", name);
-                return true;
-            }
-        }
-
-        return false;
-        };
-
-    if (!trySerialize(getBuiltInRegistry())) // try to find component in built-in registry first
-        trySerialize(getScriptRegistry()); // then try the srcipts
+    if (!trySerializeComponent(entity, componentName, arch, getBuiltInRegistry())) // try to find component in built-in registry first
+        trySerializeComponent(entity, componentName, arch, getScriptRegistry()); // then try the srcipts
 }
 
 std::vector<unsigned int> ComponentFactory::getEntityComponentUIDs(const Entity& entity) {
     std::vector<unsigned int> UIDs;
 
-    auto collectGroup = [&](const std::map<std::string, Entry>& registry) {
-        for (const auto& [name, entry] : registry) {
-            if (entry.ops.has(entity))
-                UIDs.push_back(componentNameToUID(name));
-        }
-    };
-
-    collectGroup(getBuiltInRegistry());
-    collectGroup(getScriptRegistry());
+    collectGroup(entity, UIDs, getBuiltInRegistry());
+    collectGroup(entity, UIDs, getScriptRegistry());
 
     return UIDs;
 }
@@ -160,4 +119,14 @@ const std::vector<std::string>& ComponentFactory::getScriptNames() {
 
     m_ScriptCacheValid = true;
     return names;
+}
+
+const ScriptTypeInfo* ComponentFactory::getScriptTypeInfo(unsigned int UID) {
+    const std::string& name = __componentTypeUIDToString(UID);
+
+    auto& registry = getScriptRegistry();
+    auto it = registry.find(name);
+    if (it == registry.end()) return nullptr;
+
+    return &it->second.typeInfo;
 }

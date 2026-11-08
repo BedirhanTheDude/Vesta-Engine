@@ -124,19 +124,22 @@ private:
             if (hasComponent(UID))
                 throw std::runtime_error("Entity already has this component type");
 
-            std::unique_ptr<T> behaviour = std::make_unique<T>(std::forward<Args>(args)...);
-            T* rawPtr = behaviour.get();
+            T* component = static_cast<T*>(addBehaviourRaw(UID));
 
-            addBehaviourRaw(UID, std::move(behaviour));
+            if (!component)
+                throw std::runtime_error("Failed to create behaviour component");
+
+            if constexpr (sizeof...(Args) > 0)
+                component->init(std::forward<Args>(args)...);
 
             if constexpr (Attach) {
-                if (!rawPtr->onAttach()) {
+                if (!component->onAttach()) {
                     removeComponentRaw(UID);
                     throw std::runtime_error("Component rejected attachment");
                 }
             }
 
-            return *rawPtr;
+            return *component;
         }
         else {
             static_assert(std::is_base_of_v<Component, T>, "T must derive from Component");
@@ -163,7 +166,7 @@ private:
     */
     void addBuiltInRaw(unsigned int UID) const;
     void removeComponentRaw(unsigned int UID) const;
-    BehaviourComponent* addBehaviourRaw(unsigned int UID, std::unique_ptr<BehaviourComponent> behaviour) const;
+    BehaviourComponent* addBehaviourRaw(unsigned int UID) const;
     BehaviourComponent* getBehaviourRaw(unsigned int UID) const;
 
     Scene* m_Scene = nullptr;

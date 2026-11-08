@@ -16,18 +16,18 @@ static Archive scriptsCacheArchive;
 bool cacheSaved = false;
 
 void ScriptCache::saveScriptState(const Scene& scene) {
-	auto& behaviourPools = scene.getComponentPoolRegistry()->getBehaviourPools();
+	auto& scriptPools = scene.getComponentPoolRegistry()->getScriptPools();
 	scriptsCacheArchive = Archive();
 
-	for (auto& [scriptUID, pool] : behaviourPools) {
+	for (auto& [scriptUID, pool] : scriptPools) {
 		Archive scriptArchive;
 		uint32_t index = 0;
-		for (auto& [entityHandle, behaviour] : pool) {
+		for (auto& [entityHandle, script] : pool) {
 			Archive entityArchive;
 			entityArchive.set("entityId", entityHandle.entityId);
 			entityArchive.set("generation", entityHandle.generation);
 
-			behaviour->serialize(entityArchive);
+			script.serialize(entityArchive);
 			scriptArchive.set(std::to_string(index), std::move(entityArchive));
 			++index;
 		}
@@ -43,14 +43,11 @@ void ScriptCache::saveScriptState(const Scene& scene) {
 void ScriptCache::loadScriptState(Scene& scene) {
 	if (!cacheSaved) return;
 
-	auto& behaviourPools = scene.getComponentPoolRegistry()->getBehaviourPools();
-
-	for (auto& [scriptUID, pool] : behaviourPools) {
-		std::string scriptName = componentTypeUIDToString(scriptUID);
+	for (const std::string& scriptName : ComponentFactory::getScriptNames()) {
 		if (scriptName == "<unkown_component>") continue;
 		Archive scriptArchive = scriptsCacheArchive.get(scriptName);
 
-		uint32_t entityCount;
+		uint32_t entityCount = 0;
 		scriptArchive.get("entityCount", entityCount);
 		for (uint32_t i = 0; i < entityCount; ++i) {
 			Archive entityArchive = scriptArchive.get(std::to_string(i));

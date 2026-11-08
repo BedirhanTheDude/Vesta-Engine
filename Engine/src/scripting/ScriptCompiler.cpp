@@ -99,6 +99,7 @@ HMODULE ScriptCompiler::reloadScripts(Scene* scene) {
 	}
 
 	ComponentFactory::clearScriptRegistry();
+	scene->clearScriptPools();
 
 	ScriptCompiler::unloadDLL(ScriptCompiler::getCurrentDLLHandle());
 	ScriptLoader::replaceOldDLLFile(); // on failure the old DLL is still there and gets loaded again

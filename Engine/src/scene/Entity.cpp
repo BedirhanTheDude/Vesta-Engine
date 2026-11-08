@@ -64,11 +64,11 @@ void Entity::removeComponentRaw(unsigned int UID) const {
     m_Scene->removeComponent(getHandle(), UID);
 }
 
-BehaviourComponent* Entity::addBehaviourRaw(unsigned int UID, std::unique_ptr<BehaviourComponent> behaviour) const {
+BehaviourComponent* Entity::addBehaviourRaw(unsigned int UID) const {
     if (!isValid())
         throw std::runtime_error("Cannot add a component to an invalid entity");
 
-    return m_Scene->addBehaviour(getHandle(), UID, std::move(behaviour));
+    return m_Scene->addBehaviour(getHandle(), UID);
 }
 
 BehaviourComponent* Entity::getBehaviourRaw(unsigned int UID) const {

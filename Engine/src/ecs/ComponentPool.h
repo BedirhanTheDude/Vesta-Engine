@@ -14,10 +14,10 @@ namespace ECS {
 	class ComponentPool : public IComponentPool {
 	public:
 		bool has(EntityHandle entity) const override {
-			if (entity.isInvalid() || entity >= static_cast<uint32_t>(m_Sparse.size()))
+			if (entity.isInvalid() || entity.entityId >= static_cast<uint32_t>(m_Sparse.size()))
 				return false;
 
-			uint32_t index = m_Sparse[entity];
+			uint32_t index = m_Sparse[entity.entityId];
 
 			return index != INVALID_ENTITY_INDEX &&
 				index < static_cast<uint32_t>(m_Entities.size()) &&
@@ -33,7 +33,7 @@ namespace ECS {
 
 			ensureSparseSize(entity);
 
-			m_Sparse[entity] = static_cast<uint32_t>(m_Entities.size()) - 1;
+			m_Sparse[entity.entityId] = static_cast<uint32_t>(m_Entities.size()) - 1;
 
 			return ref;
 		}
@@ -47,7 +47,7 @@ namespace ECS {
 
 			ensureSparseSize(entity);
 
-			m_Sparse[entity] = static_cast<uint32_t>(m_Entities.size()) - 1;
+			m_Sparse[entity.entityId] = static_cast<uint32_t>(m_Entities.size()) - 1;
 
 			return ref;
 		}
@@ -70,27 +70,29 @@ namespace ECS {
 
 			m_Components.pop_back();
 			m_Entities.pop_back();
-			m_Sparse[entity] = INVALID_ENTITY_INDEX;
+			m_Sparse[entity.entityId] = INVALID_ENTITY_INDEX;
 		}
 
 		T* get(EntityHandle entity) {
 			if (!has(entity))
 				return nullptr;
 
-			return &m_Components[m_Sparse[entity]];
+			return &m_Components[m_Sparse[entity.entityId]];
 		}
 
 		const T* get(EntityHandle entity) const {
 			if (!has(entity))
 				return nullptr;
 
-			return &m_Components[m_Sparse[entity]];
+			return &m_Components[m_Sparse[entity.entityId]];
 		}
 
 		void reset() override {
 			m_Components.clear();
 			m_Entities.clear();
-			m_Sparse.clear();
+			// nasty bug: m_Sparse.clear() would make everything 0 and that means every valid entity id points to the first component
+			// ok the ensureSparseSize function actually saves me but this is more explicit?
+			std::fill(m_Sparse.begin(), m_Sparse.end(), INVALID_ENTITY_INDEX);
 		}
 
 		// IComponentPool: the caller has to check has() first, add() asserts on a duplicate

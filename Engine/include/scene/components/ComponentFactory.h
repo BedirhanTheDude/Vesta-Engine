@@ -1,14 +1,63 @@
 #pragma once
 
-#include <map>
+#include <unordered_map>
+#include <type_traits>
 #include <functional>
 #include <string>
 #include <vector>
 
 #include <scene/Entity.h>
 #include <scene/components/Component.h>
+#include <scene/components/BehaviourComponent.h>
 
 class Archive;
+
+struct ScriptTypeInfo {
+    size_t size;
+    size_t alignment;
+
+    void (*constructor)(void*);
+    void (*destructor)(void*);
+    void (*moveConstructor)(void*, void*) noexcept;
+    BehaviourComponent* (*getBehaviour)(void*);
+    const BehaviourComponent* (*getBehaviourConst)(const void*);
+};
+
+template<typename T>
+ScriptTypeInfo makeTypeInfo() {
+
+    static_assert(
+        std::is_nothrow_move_constructible_v<T>,
+        "Script types must have noexcept move constructors"
+    );
+
+    return {
+        sizeof(T),
+        alignof(T),
+
+        [](void* p) {
+            new (p) T();
+        },
+
+        [](void* p) {
+            static_cast<T*>(p)->~T();
+        },
+
+        [](void* dst, void* src) noexcept {
+            T* source = static_cast<T*>(src);
+            new (dst) T(std::move(*source));
+            source->~T();
+        },
+
+        [](void* p) -> BehaviourComponent* {
+            return static_cast<BehaviourComponent*>(static_cast<T*>(p));
+        },
+
+        [](const void* p) -> const BehaviourComponent* {
+            return static_cast<const BehaviourComponent*>(static_cast<const T*>(p));
+        }
+    };
+}
 
 // type agnostic operations every component needs
 struct ComponentOps {
@@ -48,7 +97,7 @@ struct ComponentOps {
                 c.onAttach(); \
             }, COMPONENT_OPS(Type)); \
             return true; \
-        }() \
+        }(); \
     }
 
 class ComponentFactory {
@@ -56,7 +105,7 @@ public:
     using Creator = std::function<void(Entity&, const Archive&)>;
 
     static void registerBuiltIn(const std::string& name, Creator creator, ComponentOps ops);
-    static void registerScript(const std::string& name, Creator creator, ComponentOps ops);
+    static void registerScript(const std::string& name, Creator creator, ComponentOps ops, ScriptTypeInfo info);
     static void create(const std::string& name, Entity& entity, const Archive& arch);
     static void fillExistingComponent(Entity& entity, const Archive& arch);
     static void clearScriptRegistry();
@@ -76,23 +125,28 @@ public:
     static const std::vector<std::string>& getBuiltInNames();
     static const std::vector<std::string>& getScriptNames();
 
-private:
-    static bool m_ScriptCacheValid;
-
-    struct Entry {
+    struct BuiltInEntry {
         Creator creator;
         ComponentOps ops;
     };
 
-    static std::map<std::string, Entry>& getScriptRegistry() {
-        static std::map<std::string, Entry> scriptRegistry;
+    struct ScriptEntry {
+        Creator creator;
+        ComponentOps ops;
+        ScriptTypeInfo typeInfo;
+    };
+
+    static const ScriptTypeInfo* getScriptTypeInfo(unsigned int UID);
+private:
+    static bool m_ScriptCacheValid;
+
+    static std::unordered_map<std::string, ScriptEntry>& getScriptRegistry() {
+        static std::unordered_map<std::string, ScriptEntry> scriptRegistry;
         return scriptRegistry;
     }
 
-    static std::map<std::string, Entry>& getBuiltInRegistry() {
-        static std::map<std::string, Entry> builtInRegistry;
+    static std::unordered_map<std::string, BuiltInEntry>& getBuiltInRegistry() {
+        static std::unordered_map<std::string, BuiltInEntry> builtInRegistry;
         return builtInRegistry;
     }
-
-    static const Entry* findEntry(unsigned int UID);
 };

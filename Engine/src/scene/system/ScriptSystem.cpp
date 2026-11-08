@@ -7,8 +7,8 @@
 namespace ScriptSystem {
 
 	void clearScripts(Scene& scene) {
-		auto& behaviourPools = scene.getComponentPoolRegistry()->getBehaviourPools();
-		for (auto& [UID, pool] : behaviourPools)
+		auto& scriptPools = scene.getComponentPoolRegistry()->getScriptPools();
+		for (auto& [UID, pool] : scriptPools)
 			pool.reset();
 	}
 }

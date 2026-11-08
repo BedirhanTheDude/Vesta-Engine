@@ -17,6 +17,9 @@ class BehaviourComponent : public Component, public PropertyHolder,
 public:
     friend class Scene;
 
+    BehaviourComponent() = default;
+    BehaviourComponent(BehaviourComponent&&) noexcept = default;
+    BehaviourComponent& operator=(BehaviourComponent&&) noexcept = default;
     virtual ~BehaviourComponent() = default;
 
     virtual bool onAttach() { return true; }

@@ -10,6 +10,8 @@
 #include <scene/components/PointLightComponent.h>
 #include <scene/components/RigidBodyComponent.h>
 
+#include <scene/components/ComponentFactory.h>
+
 namespace ECS {
 	ComponentPoolRegistry::ComponentPoolRegistry() {
 		m_Pools[componentTypeUID<TransformComponent>()] = &m_Transforms;
@@ -27,14 +29,14 @@ namespace ECS {
 		for (auto& [UID, pool] : m_Pools)
 			pool->reset();
 
-		m_BehaviourPools.clear();
+		m_ScriptPools.clear();
 	}
 
 	void ComponentPoolRegistry::removeEntityComponents(const EntityHandle& handle) {
 		for (auto& [UID, pool] : m_Pools)
 			pool->remove(handle);
 
-		for (auto& [UID, pool] : m_BehaviourPools)
+		for (auto& [UID, pool] : m_ScriptPools)
 			pool.remove(handle);
 	}
 
@@ -43,17 +45,27 @@ namespace ECS {
 		return it != m_Pools.end() ? it->second : nullptr;
 	}
 
-	ComponentPoolRegistry::BehaviourPool* ComponentPoolRegistry::getBehaviourPool(uint32_t UID) {
-		auto it = m_BehaviourPools.find(UID);
-		return it != m_BehaviourPools.end() ? &it->second : nullptr;
+	ScriptPool* ComponentPoolRegistry::getScriptPool(uint32_t UID) {
+		auto it = m_ScriptPools.find(UID);
+		return it != m_ScriptPools.end() ? &it->second : nullptr;
 	}
 
-	ComponentPoolRegistry::BehaviourPool& ComponentPoolRegistry::getOrCreateBehaviourPool(uint32_t UID) {
-		return m_BehaviourPools[UID];
+	ScriptPool* ComponentPoolRegistry::getOrCreateScriptPool(uint32_t UID) {
+		auto it = m_ScriptPools.find(UID);
+
+		if (it != m_ScriptPools.end())
+			return &it->second;
+
+		const ScriptTypeInfo* info = ComponentFactory::getScriptTypeInfo(UID);
+		if (!info) return nullptr;
+
+		auto [insertedIt, success] = m_ScriptPools.try_emplace(UID, *info);
+
+		return &insertedIt->second;
 	}
 
-	std::unordered_map<uint32_t, ComponentPoolRegistry::BehaviourPool>& ComponentPoolRegistry::getBehaviourPools() {
-		return m_BehaviourPools;
+	std::unordered_map<uint32_t, ScriptPool>& ComponentPoolRegistry::getScriptPools() {
+		return m_ScriptPools;
 	}
 
 	ComponentPool<Transform>& ComponentPoolRegistry::getTransforms() { return m_Transforms; }

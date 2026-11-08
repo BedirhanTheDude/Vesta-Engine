@@ -9,7 +9,7 @@
 class Archive;
 
 #define BEGIN_SCRIPT(ScriptName) \
-    class ScriptName : public BehaviourComponent {
+class ScriptName : public BehaviourComponent {
 
 // for registering ONLY user level scripts/components
 // lambda is declared inline in a static context, executes before main()
@@ -26,7 +26,7 @@ class Archive;
             ComponentFactory::registerScript(#ScriptName, [](Entity& e, const Archive& arch) { \
                 auto& c = e.addComponent<ScriptName>(); \
                 c.deserialize(arch); \
-            }, COMPONENT_OPS(ScriptName)); \
+            }, COMPONENT_OPS(ScriptName), makeTypeInfo<ScriptName>()); \
             return true; \
         }(); \
     }

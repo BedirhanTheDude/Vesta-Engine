@@ -300,7 +300,7 @@ void Scene::pasteComponent(uint32_t entityId, const Archive& componentArchive) {
 	uint32_t componentUID = componentNameToUID(typeName);
 	auto* pool = m_ComponentRegistry->getPool(componentUID);
 	if (!pool) // component wasn't built-in
-		pool = m_ComponentRegistry->getBehaviourPool(componentUID);
+		pool = m_ComponentRegistry->getScriptPool(componentUID);
 
 	if (!pool) return;
 
@@ -509,7 +509,7 @@ void Scene::pullRigidBodies() {
 void Scene::tickBehaviours(float dt) {
 	m_BehaviourTickList.clear();
 
-	for (auto& [UID, pool] : m_ComponentRegistry->getBehaviourPools()) {
+	for (auto& [UID, pool] : m_ComponentRegistry->getScriptPools()) {
 		for (auto item : pool)
 			m_BehaviourTickList.push_back({ UID, item.entity.entityId, item.entity.generation });
 	}
@@ -518,24 +518,24 @@ void Scene::tickBehaviours(float dt) {
 		ECS::EntityHandle handle{ entry.entityId, entry.generation };
 		if (!m_EntityManager->isAlive(handle)) continue;
 
-		ECS::ComponentPoolRegistry::BehaviourPool* pool = m_ComponentRegistry->getBehaviourPool(entry.UID);
+		ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(entry.UID);
 		if (!pool) continue;
 
-		std::unique_ptr<BehaviourComponent>* slot = pool->get(handle);
-		if (slot && *slot)
-			(*slot)->tick(dt);
+		BehaviourComponent* slot = pool->getBehaviour(handle);
+		if (slot)
+			slot->tick(dt);
 	}
 
 	for (const BehaviourTickEntry& entry : m_BehaviourTickList) {
 		ECS::EntityHandle handle{ entry.entityId, entry.generation };
 		if (!m_EntityManager->isAlive(handle)) continue;
 
-		ECS::ComponentPoolRegistry::BehaviourPool* pool = m_ComponentRegistry->getBehaviourPool(entry.UID);
+		ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(entry.UID);
 		if (!pool) continue;
 
-		std::unique_ptr<BehaviourComponent>* slot = pool->get(handle);
-		if (slot && *slot && (*slot)->m_Started)
-			(*slot)->onLateUpdate(dt);
+		BehaviourComponent* slot = pool->getBehaviour(handle);
+		if (slot && slot->m_Started)
+			slot->onLateUpdate(dt);
 	}
 }
 
@@ -565,7 +565,7 @@ bool Scene::hasComponent(const ECS::EntityHandle& handle, unsigned int UID) cons
 	if (ECS::IComponentPool* pool = m_ComponentRegistry->getPool(UID))
 		return pool->has(handle);
 
-	if (ECS::ComponentPoolRegistry::BehaviourPool* pool = m_ComponentRegistry->getBehaviourPool(UID))
+	if (ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(UID))
 		return pool->has(handle);
 
 	return false;
@@ -580,33 +580,34 @@ void Scene::removeComponent(const ECS::EntityHandle& handle, unsigned int UID) {
 		return;
 	}
 
-	if (ECS::ComponentPoolRegistry::BehaviourPool* pool = m_ComponentRegistry->getBehaviourPool(UID))
+	if (ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(UID))
 		pool->remove(handle);
 }
 
-BehaviourComponent* Scene::addBehaviour(const ECS::EntityHandle& handle, unsigned int UID,
-	std::unique_ptr<BehaviourComponent> behaviour) {
-	// the caller keeps a raw pointer to the behaviour, so dropping it silently here would leave that dangling
-	if (!behaviour || !m_EntityManager->isAlive(handle))
+BehaviourComponent* Scene::addBehaviour(const ECS::EntityHandle& handle, unsigned int UID) {
+	if (!m_EntityManager->isAlive(handle))
 		throw std::runtime_error("Cannot add a component to an entity that is not alive");
+
+	auto* pool = m_ComponentRegistry->getOrCreateScriptPool(UID);
+	assert(pool);
+
+	pool->add(handle);
+	auto* behaviour = pool->getBehaviour(handle);
+
+	if (!behaviour)
+		throw std::runtime_error("Failed to allocate script pool storage");
 
 	behaviour->entity = Entity(this, handle);
 	behaviour->m_TypeUID = UID;
 
-	ECS::ComponentPoolRegistry::BehaviourPool& pool = m_ComponentRegistry->getOrCreateBehaviourPool(UID);
-
-	std::unique_ptr<BehaviourComponent>& slot = pool.add(handle);
-	slot = std::move(behaviour);
-
-	return slot.get();
+	return behaviour;
 }
 
 BehaviourComponent* Scene::getBehaviour(const ECS::EntityHandle& handle, unsigned int UID) const {
-	ECS::ComponentPoolRegistry::BehaviourPool* pool = m_ComponentRegistry->getBehaviourPool(UID);
+	auto* pool = m_ComponentRegistry->getScriptPool(UID);
 	if (!pool) return nullptr;
 
-	std::unique_ptr<BehaviourComponent>* slot = pool->get(handle);
-	return slot ? slot->get() : nullptr;
+	return pool->getBehaviour(handle);
 }
 
 void Scene::addNewEntities() {
@@ -638,6 +639,10 @@ void Scene::removeDeadEntities() {
 		m_EntityManager->destroy(handle); // bumps the generation, every handle to this entity is stale from here on
 	}
 	m_EntitiesToRemove.clear();
+}
+
+void Scene::clearScriptPools() {
+	m_ComponentRegistry->getScriptPools().clear();
 }
 
 void Scene::clear() {

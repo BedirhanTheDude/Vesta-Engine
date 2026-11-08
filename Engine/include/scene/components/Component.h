@@ -8,7 +8,9 @@
 class Component : ISerializable {
 public:
 	Component() = default;
-	explicit Component(const Entity& entity) : entity(entity) {}
+    explicit Component(const Entity& entity) : entity(entity) {}
+    Component(Component&&) noexcept = default;
+    Component& operator=(Component&&) noexcept = default;
 
 	Entity getEntity() const { return entity; }
 

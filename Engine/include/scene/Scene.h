@@ -22,6 +22,7 @@ class Scene {
     friend class Application;
     friend class Entity;
     friend class Project;
+    friend class ScriptCompiler;
 public:
     ~Scene();
 
@@ -98,12 +99,14 @@ private:
     void addBuiltInComponent(const ECS::EntityHandle& handle, unsigned int UID);
     bool hasComponent(const ECS::EntityHandle& handle, unsigned int UID) const;
     void removeComponent(const ECS::EntityHandle& handle, unsigned int UID);
-    BehaviourComponent* addBehaviour(const ECS::EntityHandle& handle, unsigned int UID, std::unique_ptr<BehaviourComponent> behaviour);
+    BehaviourComponent* addBehaviour(const ECS::EntityHandle& handle, unsigned int UID);
     BehaviourComponent* getBehaviour(const ECS::EntityHandle& handle, unsigned int UID) const;
 
     void tickBehaviours(float dt);
     void pushRigidBodies(); // transform -> physics world
     void pullRigidBodies(); // physics world -> transform
+
+    void clearScriptPools();
 
     float m_PhysicsAccumulator = 0.0f;
     float m_ColliderCacheTimer = 0.0f;

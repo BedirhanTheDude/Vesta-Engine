@@ -1,7 +1,8 @@
 #pragma once
 
-#include <ecs/ComponentPool.h>
 #include <ecs/IComponentPool.h>
+#include <ecs/ComponentPool.h>
+#include <ecs/ScriptPool.h>
 
 #include <scene/components/Transform.h>
 #include <scene/components/Camera.h>
@@ -22,9 +23,6 @@ namespace ECS {
 
 	class ComponentPoolRegistry {
 	public:
-		// Behaviours are heap objects
-		using BehaviourPool = ComponentPool<std::unique_ptr<BehaviourComponent>>;
-
 		ComponentPoolRegistry();
 		~ComponentPoolRegistry();
 
@@ -37,9 +35,9 @@ namespace ECS {
 		// Type-erased access to a built-in pool by its proxy's component type UID, nullptr if unknown.
 		IComponentPool* getPool(uint32_t UID);
 
-		BehaviourPool* getBehaviourPool(uint32_t UID);
-		BehaviourPool& getOrCreateBehaviourPool(uint32_t UID);
-		std::unordered_map<uint32_t, BehaviourPool>& getBehaviourPools();
+		ScriptPool* getScriptPool(uint32_t UID);
+		ScriptPool* getOrCreateScriptPool(uint32_t UID);
+		std::unordered_map<uint32_t, ScriptPool>& getScriptPools();
 
 		ComponentPool<Transform>& getTransforms();
 		ComponentPool<Camera>& getCameras();
@@ -72,6 +70,6 @@ namespace ECS {
 		ComponentPool<RigidBody> m_RigidBodies;
 
 		std::unordered_map<uint32_t, IComponentPool*> m_Pools; // proxy UID -> pool above, pointers into this object
-		std::unordered_map<uint32_t, BehaviourPool> m_BehaviourPools; // script UID -> pool, created on first use
+		std::unordered_map<uint32_t, ScriptPool> m_ScriptPools; // script UID -> pool, created on first use
 	};
 }
