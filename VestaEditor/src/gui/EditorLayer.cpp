@@ -109,10 +109,10 @@ void EditorLayer::ShowMenuBar() {
             if (ImGui::MenuItem("New Scene"))
                 createNewScene = true;
 
-            if (ImGui::MenuItem("Reload Scene", "Ctrl+O")) {
+            if (ImGui::MenuItem("Reload Scene")) {
                 SceneController::loadScene();
             }
-            if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {
+            if (ImGui::MenuItem("Save Scene")) {
                 SceneController::saveScene();
             }
             ImGui::Separator();

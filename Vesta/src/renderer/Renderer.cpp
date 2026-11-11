@@ -233,7 +233,7 @@ void Renderer::render(const RenderingSystem::SceneRenderView* renderView,
 	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
 	glActiveTexture(GL_TEXTURE0);
 
-	for (const RenderingSystem::Renderable renderable : renderView->renderables) {
+	for (const RenderingSystem::Renderable& renderable : renderView->renderables) {
 
 		drawEntity(renderable.model, renderable.mesh, renderable.material, frame, false);
 

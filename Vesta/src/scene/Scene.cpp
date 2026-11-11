@@ -25,6 +25,7 @@
 #include <ecs/EntityHandle.h>
 #include <ecs/EntityManager.h>
 #include <ecs/ComponentPool.h>
+#include <ecs/ScriptPool.h>
 #include <ecs/ComponentPoolRegistry.h>
 
 #include <utility>
@@ -508,35 +509,41 @@ void Scene::pullRigidBodies() {
 
 void Scene::tickBehaviours(float dt) {
 	m_BehaviourTickList.clear();
+	m_BehaviourTickListPoolRecords.clear();
 
 	for (auto& [UID, pool] : m_ComponentRegistry->getScriptPools()) {
+		size_t poolStart = m_BehaviourTickList.size();
 		for (auto item : pool)
-			m_BehaviourTickList.push_back({ UID, item.entity.entityId, item.entity.generation });
+			m_BehaviourTickList.push_back({ item.entity.entityId, item.entity.generation });
+		size_t poolEnd = m_BehaviourTickList.size();
+		m_BehaviourTickListPoolRecords.push_back({ UID, poolStart, poolEnd });
 	}
 
-	for (const BehaviourTickEntry& entry : m_BehaviourTickList) {
-		ECS::EntityHandle handle{ entry.entityId, entry.generation };
-		if (!m_EntityManager->isAlive(handle)) continue;
+	for (const BehaviourTickListPoolRecord& poolRecord : m_BehaviourTickListPoolRecords)
+		for (size_t i = poolRecord.start; i < poolRecord.end; ++i) {
+			const BehaviourTickEntry& entry = m_BehaviourTickList[i];
+			ECS::EntityHandle handle{ entry.entityId, entry.generation };
 
-		ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(entry.UID);
-		if (!pool) continue;
+			ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(poolRecord.UID);
+			if (!pool) break; // If pool doesn't exist than this whole line of scripts is invalid
 
-		BehaviourComponent* slot = pool->getBehaviour(handle);
-		if (slot)
-			slot->tick(dt);
-	}
+			BehaviourComponent* beh = pool->getBehaviour(handle);
+			if (beh)
+				beh->tick(dt);
+		}
 
-	for (const BehaviourTickEntry& entry : m_BehaviourTickList) {
-		ECS::EntityHandle handle{ entry.entityId, entry.generation };
-		if (!m_EntityManager->isAlive(handle)) continue;
+	for (const BehaviourTickListPoolRecord& poolRecord : m_BehaviourTickListPoolRecords)
+		for (size_t i = poolRecord.start; i < poolRecord.end; ++i) {
+			const BehaviourTickEntry& entry = m_BehaviourTickList[i];
+			ECS::EntityHandle handle{ entry.entityId, entry.generation };
 
-		ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(entry.UID);
-		if (!pool) continue;
+			ECS::ScriptPool* pool = m_ComponentRegistry->getScriptPool(poolRecord.UID);
+			if (!pool) break;
 
-		BehaviourComponent* slot = pool->getBehaviour(handle);
-		if (slot && slot->m_Started)
-			slot->onLateUpdate(dt);
-	}
+			BehaviourComponent* beh = pool->getBehaviour(handle);
+			if (beh)
+				beh->onLateUpdate(dt);
+		}
 }
 
 PhysicsWorld& Scene::getPhysicsWorld() { return *m_PhysicsWorld; }

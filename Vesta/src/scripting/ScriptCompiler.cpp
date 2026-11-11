@@ -20,7 +20,7 @@
 HMODULE ScriptCompiler::currentDLLHandle;
 bool ScriptCompiler::pollingEnabled = true;
 
-// the bundled compiler, include/ and Engine.lib are next to the executable
+// the bundled compiler, include/ and Vesta.lib are next to the executable
 static std::wstring getExecutableDirectory() {
 	std::wstring buffer(MAX_PATH, L'\0');
 

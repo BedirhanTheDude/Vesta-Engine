@@ -14,121 +14,124 @@ add_subdirectory(external/lunasvg)
 
 find_package(OpenGL REQUIRED)
 
-# Engine sources
-# Engine sources
+# Vesta sources
 set(PHYSICS_SRC
-    Engine/src/physics/CollisionShape.cpp
-    Engine/src/physics/PhysicsMaterial.cpp
-    Engine/src/physics/PhysicsWorld.cpp
+    Vesta/src/physics/CollisionShape.cpp
+    Vesta/src/physics/PhysicsMaterial.cpp
+    Vesta/src/physics/PhysicsWorld.cpp
 )
 
 set(PHYSICS_BODY_SRC
-    Engine/src/physics/body/DynamicPhysicsBody.cpp
-    Engine/src/physics/body/PhysicsBody.cpp
-    Engine/src/physics/body/StaticPhysicsBody.cpp
+    Vesta/src/physics/body/DynamicPhysicsBody.cpp
+    Vesta/src/physics/body/PhysicsBody.cpp
+    Vesta/src/physics/body/StaticPhysicsBody.cpp
 )
 
 set(SCENE_SRC
-    Engine/src/scene/Entity.cpp
-    Engine/src/scene/Scene.cpp
+    Vesta/src/scene/Entity.cpp
+    Vesta/src/scene/Scene.cpp
 )
 
 set(SCENE_COMPONENT_SRC
-    Engine/src/scene/components/BehaviourComponent.cpp
-    Engine/src/scene/components/CameraComponent.cpp
-    Engine/src/scene/components/ComponentFactory.cpp
-    Engine/src/scene/components/DirectionalLightComponent.cpp
-    Engine/src/scene/components/MaterialComponent.cpp
-    Engine/src/scene/components/MeshComponent.cpp
-    Engine/src/scene/components/PointLightComponent.cpp
-    Engine/src/scene/components/RigidBodyComponent.cpp
-    Engine/src/scene/components/TransformComponent.cpp
+    Vesta/src/scene/components/BehaviourComponent.cpp
+    Vesta/src/scene/components/CameraComponent.cpp
+    Vesta/src/scene/components/ComponentFactory.cpp
+    Vesta/src/scene/components/DirectionalLightComponent.cpp
+    Vesta/src/scene/components/MaterialComponent.cpp
+    Vesta/src/scene/components/MeshComponent.cpp
+    Vesta/src/scene/components/PointLightComponent.cpp
+    Vesta/src/scene/components/RigidBodyComponent.cpp
+    Vesta/src/scene/components/TransformComponent.cpp
 )
 
 set(SCENE_SYSTEM_SRC
-    Engine/src/scene/system/CameraSystem.cpp
-    Engine/src/scene/system/DirectionalLightSystem.cpp
-    Engine/src/scene/system/MaterialSystem.cpp
-    Engine/src/scene/system/MeshSystem.cpp
-    Engine/src/scene/system/PointLightSystem.cpp
-    Engine/src/scene/system/RigidBodySystem.cpp
-    Engine/src/scene/system/RenderingSystem.cpp
-    Engine/src/scene/system/ScriptSystem.cpp
-    Engine/src/scene/system/TransformSystem.cpp
+    Vesta/src/scene/system/CameraSystem.cpp
+    Vesta/src/scene/system/DirectionalLightSystem.cpp
+    Vesta/src/scene/system/MaterialSystem.cpp
+    Vesta/src/scene/system/MeshSystem.cpp
+    Vesta/src/scene/system/PointLightSystem.cpp
+    Vesta/src/scene/system/RigidBodySystem.cpp
+    Vesta/src/scene/system/RenderingSystem.cpp
+    Vesta/src/scene/system/ScriptSystem.cpp
+    Vesta/src/scene/system/TransformSystem.cpp
 )
 
 set(RENDERER_SRC
-    Engine/src/renderer/Colourpickingrenderer.cpp
-    Engine/src/renderer/Material.cpp
-    Engine/src/renderer/Mesh.cpp
-    Engine/src/renderer/ObjLoader.cpp
-    Engine/src/renderer/PrimitiveFactory.cpp
-    Engine/src/renderer/Renderer.cpp
-    Engine/src/renderer/ShaderProgram.cpp
-    Engine/src/renderer/Texture.cpp
-    Engine/src/renderer/ViewportFramebuffer.cpp
-    Engine/src/renderer/stb_impl.cpp
+    Vesta/src/renderer/Colourpickingrenderer.cpp
+    Vesta/src/renderer/Material.cpp
+    Vesta/src/renderer/Mesh.cpp
+    Vesta/src/renderer/ObjLoader.cpp
+    Vesta/src/renderer/PrimitiveFactory.cpp
+    Vesta/src/renderer/Renderer.cpp
+    Vesta/src/renderer/ShaderProgram.cpp
+    Vesta/src/renderer/Texture.cpp
+    Vesta/src/renderer/ViewportFramebuffer.cpp
+    Vesta/src/renderer/stb_impl.cpp
 )
 
 set(CORE_SRC
-    Engine/src/core/Application.cpp
-    Engine/src/core/AssetManager.cpp
-    Engine/src/core/Input.cpp
-    Engine/src/core/Project.cpp
+    Vesta/src/core/Application.cpp
+    Vesta/src/core/AssetManager.cpp
+    Vesta/src/core/Input.cpp
+    Vesta/src/core/Project.cpp
 )
 
 set(ECS_SRC
-    Engine/src/ecs/EntityManager.cpp
-    Engine/src/ecs/ComponentPoolRegistry.cpp
-    Engine/src/ecs/ScriptPool.cpp
+    Vesta/src/ecs/EntityManager.cpp
+    Vesta/src/ecs/ComponentPoolRegistry.cpp
+    Vesta/src/ecs/ScriptPool.cpp
 )
 
 set(PROPERTY_SRC
-    Engine/src/property/ComponentReflection.cpp
-    Engine/src/property/PropertySerializer.cpp
+    Vesta/src/property/ComponentReflection.cpp
+    Vesta/src/property/PropertySerializer.cpp
 )
 
 set(PERSISTANCE_SRC
-    Engine/src/persistance/Archive.cpp
-    Engine/src/persistance/SceneSerializer.cpp
+    Vesta/src/persistance/Archive.cpp
+    Vesta/src/persistance/SceneSerializer.cpp
 )
 
 set(SCRIPTING_SRC
-    Engine/src/scripting/ScriptCache.cpp
-    Engine/src/scripting/ScriptCompiler.cpp
-    Engine/src/scripting/ScriptLoader.cpp
+    Vesta/src/scripting/ScriptCache.cpp
+    Vesta/src/scripting/ScriptCompiler.cpp
+    Vesta/src/scripting/ScriptLoader.cpp
 )
 
 set(UTILITY_SRC
-    Engine/src/utility/Hash.cpp
+    Vesta/src/utility/Hash.cpp
 )
 
-# Editor sources
+# VestaEditor sources
 set(GUI_SRC
-    Editor/src/gui/EditorCamera.cpp
-    Editor/src/gui/EditorLayer.cpp
-    Editor/src/gui/FileManagerPanel.cpp
-    Editor/src/gui/HierarchyPanel.cpp
-    Editor/src/gui/ImGuiLayer.cpp
-    Editor/src/gui/Thumbnail.cpp
-    Editor/src/gui/SvgPixels.cpp
+    VestaEditor/src/gui/EditorCamera.cpp
+    VestaEditor/src/gui/EditorLayer.cpp
+    VestaEditor/src/gui/FileManagerPanel.cpp
+    VestaEditor/src/gui/HierarchyPanel.cpp
+    VestaEditor/src/gui/ImGuiLayer.cpp
+    VestaEditor/src/gui/Thumbnail.cpp
+    VestaEditor/src/gui/SvgPixels.cpp
+)
+
+set(EDITOR_APP_SRC
+    VestaEditor/src/EditorApp.cpp
 )
 
 set(CONTROLLER_SRC
-    Editor/src/controller/AssetController.cpp
-    Editor/src/controller/ComponentController.cpp
-    Editor/src/controller/EditorSelectionController.cpp
-    Editor/src/controller/EntityController.cpp
-    Editor/src/controller/FileTypeController.cpp
-    Editor/src/controller/ProjectController.cpp
-    Editor/src/controller/SceneController.cpp
-    Editor/src/controller/ScriptingController.cpp
-    Editor/src/controller/TransformController.cpp
-    Editor/src/controller/WindowController.cpp
+    VestaEditor/src/controller/AssetController.cpp
+    VestaEditor/src/controller/ComponentController.cpp
+    VestaEditor/src/controller/EditorSelectionController.cpp
+    VestaEditor/src/controller/EntityController.cpp
+    VestaEditor/src/controller/FileTypeController.cpp
+    VestaEditor/src/controller/ProjectController.cpp
+    VestaEditor/src/controller/SceneController.cpp
+    VestaEditor/src/controller/ScriptingController.cpp
+    VestaEditor/src/controller/TransformController.cpp
+    VestaEditor/src/controller/WindowController.cpp
 )
 
 set(PLATFORM_SRC
-    Editor/src/platform/FileDialog.cpp
+    VestaEditor/src/platform/FileDialog.cpp
 )
 
 set(IMGUI_SRC
@@ -142,8 +145,8 @@ set(IMGUI_SRC
     external/imguizmo/src/ImGuizmo.cpp
 )
 
-# Engine.dll (whole engine in a single .dll)
-add_library(Engine SHARED
+# Vesta.dll (whole engine in a single .dll)
+add_library(Vesta SHARED
     ${PERSISTANCE_SRC}
     ${PROPERTY_SRC}
     ${CORE_SRC}
@@ -156,24 +159,24 @@ add_library(Engine SHARED
     ${RENDERER_SRC}
     ${SCRIPTING_SRC}
     ${UTILITY_SRC}
-    Engine/src/renderer/glad.c
+    Vesta/src/renderer/glad.c
 )
 
-set_target_properties(Engine PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set_target_properties(Vesta PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-target_include_directories(Engine PRIVATE
+target_include_directories(Vesta PRIVATE
     ${PHYSX_DIR}/include
 )
 
-target_include_directories(Engine PUBLIC
-    Engine/include
-    Engine/src
+target_include_directories(Vesta PUBLIC
+    Vesta/include
+    Vesta/src
     external
     external/glm
     external/stb
 )
 
-target_link_libraries(Engine PUBLIC
+target_link_libraries(Vesta PUBLIC
     glfw
     OpenGL::GL
     ${PHYSX_LIB_DIR}/PhysX_64.lib
@@ -184,69 +187,72 @@ target_link_libraries(Engine PUBLIC
     ${PHYSX_LIB_DIR}/PhysXPvdSDK_static_64.lib
 )
 
-target_compile_definitions(Engine
+target_compile_definitions(Vesta
     PRIVATE   GLAD_GLAPI_EXPORT GLAD_GLAPI_EXPORT_BUILD
     INTERFACE GLAD_GLAPI_EXPORT
 )
 
 # built-in shaders are read straight from the source tree, so edits don't need a copy step
 # NOTE: this makes the exe depend on the source tree, a distributable build has to copy them next to the exe instead
-target_compile_definitions(Engine PRIVATE
-    VESTA_ENGINE_SHADER_DIR=u8"${CMAKE_SOURCE_DIR}/Engine/src/renderer/shaders/"
+target_compile_definitions(Vesta PRIVATE
+    VESTA_ENGINE_SHADER_DIR=u8"${CMAKE_SOURCE_DIR}/Vesta/src/renderer/shaders/"
 )
 
 if (MSVC)
-    target_compile_options(Engine PUBLIC /utf-8)
+    target_compile_options(Vesta PUBLIC /utf-8)
 endif()
 
 # Editor.lib
-add_library(Editor STATIC
+add_library(VestaEditor STATIC
+    ${EDITOR_APP_SRC}
     ${GUI_SRC}
     ${CONTROLLER_SRC}
     ${PLATFORM_SRC}
     ${IMGUI_SRC}
 )
 
-target_include_directories(Editor PUBLIC
-    Editor/src
+target_include_directories(VestaEditor PUBLIC
+    VestaEditor/src
     external/imgui
     external/imgui/backends
     external/imguizmo
     external/lunasvg
 )
 
-target_link_libraries(Editor PUBLIC Engine)
-target_link_libraries(Editor PRIVATE lunasvg)
+target_link_libraries(VestaEditor PUBLIC Vesta)
+target_link_libraries(VestaEditor PRIVATE lunasvg)
 
 # Editor Resources
-file(COPY Editor/resources DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY Sandbox/icon.png DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY VestaEditor/resources DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY VestaRuntime/icon.png DESTINATION ${CMAKE_BINARY_DIR})
 
-add_executable(Sandbox Sandbox/src/main.cpp)
-
-# opened when there is no project on the command line and no last opened project
-target_compile_definitions(Sandbox PRIVATE
-    VESTA_SAMPLE_PROJECT=u8"${CMAKE_SOURCE_DIR}/SampleProject"
-)
+add_executable(VestaRuntime VestaRuntime/main.cpp)
 
 if(WIN32)
-    target_sources(Sandbox PRIVATE Sandbox/resources.rc)
-    set_source_files_properties(Sandbox/resources.rc PROPERTIES
-        COMPILE_FLAGS "/I\"${CMAKE_CURRENT_SOURCE_DIR}/Sandbox\"")
+    target_sources(VestaRuntime PRIVATE VestaRuntime/resources.rc)
+    set_source_files_properties(VestaRuntime/resources.rc PROPERTIES
+        COMPILE_FLAGS "/I\"${CMAKE_CURRENT_SOURCE_DIR}/VestaRuntime\"")
 endif()
 
-target_link_libraries(Sandbox PRIVATE Editor Engine)
+target_link_libraries(VestaRuntime PRIVATE VestaEditor Vesta)
+
+# Release is a native windowed app (no console)
+if(MSVC)
+    target_link_options(VestaRuntime PRIVATE
+        "$<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS;/ENTRY:mainCRTStartup>"
+    )
+endif()
 
 set(PHYSX_DLL_NAMES PhysX_64.dll PhysXCommon_64.dll PhysXFoundation_64.dll PhysXCooking_64.dll)
 foreach(DLL ${PHYSX_DLL_NAMES})
-    add_custom_command(TARGET Sandbox POST_BUILD
+    add_custom_command(TARGET VestaRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${PHYSX_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/${DLL}
-        $<TARGET_FILE_DIR:Sandbox>)
+        $<TARGET_FILE_DIR:VestaRuntime>)
 endforeach()
 
-add_custom_command(TARGET Sandbox POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:glfw> $<TARGET_FILE_DIR:Sandbox>)
+add_custom_command(TARGET VestaRuntime POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:glfw> $<TARGET_FILE_DIR:VestaRuntime>)
 
 set(CLANG_CL ${CMAKE_SOURCE_DIR}/dependencies/llvm/bin/clang-cl.exe)
 set(LLDLINK  ${CMAKE_SOURCE_DIR}/dependencies/llvm/bin/lld-link.exe)
@@ -256,14 +262,14 @@ else()
     message(WARNING "clang-cl not found at: ${CLANG_CL}")
 endif()
 
-add_custom_command(TARGET Sandbox POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CLANG_CL} $<TARGET_FILE_DIR:Sandbox>/compiler/clang-cl.exe)
-add_custom_command(TARGET Sandbox POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${LLDLINK} $<TARGET_FILE_DIR:Sandbox>/compiler/lld-link.exe)
+add_custom_command(TARGET VestaRuntime POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CLANG_CL} $<TARGET_FILE_DIR:VestaRuntime>/compiler/clang-cl.exe)
+add_custom_command(TARGET VestaRuntime POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${LLDLINK} $<TARGET_FILE_DIR:VestaRuntime>/compiler/lld-link.exe)
 
-add_custom_command(TARGET Sandbox POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Engine/include $<TARGET_FILE_DIR:Sandbox>/include
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/glm/glm $<TARGET_FILE_DIR:Sandbox>/include/glm
+add_custom_command(TARGET VestaRuntime POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Vesta/include $<TARGET_FILE_DIR:VestaRuntime>/include
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/glm/glm $<TARGET_FILE_DIR:VestaRuntime>/include/glm
 )
 
 file(GLOB_RECURSE SCRIPT_HEADERS CONFIGURE_DEPENDS SampleProject/*.h)
@@ -273,7 +279,7 @@ if(SCRIPT_HEADERS)
     set_target_properties(ScriptsIntelliSense PROPERTIES LINKER_LANGUAGE CXX)
     set_source_files_properties(${SCRIPT_HEADERS} PROPERTIES LANGUAGE CXX)
     target_include_directories(ScriptsIntelliSense PRIVATE
-        Engine/include
+        Vesta/include
         external/glm
     )
 endif()

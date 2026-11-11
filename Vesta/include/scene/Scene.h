@@ -10,6 +10,7 @@
 namespace ECS {
     struct EntityHandle;
 
+    class ScriptPool;
     class ComponentPoolRegistry;
     class EntityManager;
 }
@@ -138,11 +139,17 @@ private:
     // Scratch of tickBehaviours, kept between frames so its capacity is reused instead of allocating every
     // frame. An entity handle as raw fields, same reason as activeCameraEntityId.
     struct BehaviourTickEntry {
-        uint32_t UID;
         uint32_t entityId;
         uint32_t generation;
     };
     std::vector<BehaviourTickEntry> m_BehaviourTickList;
+
+    struct BehaviourTickListPoolRecord {
+        uint32_t UID;
+        size_t start;
+        size_t end;
+    };
+    std::vector<BehaviourTickListPoolRecord> m_BehaviourTickListPoolRecords;
 
     std::unique_ptr<ECS::EntityManager> m_EntityManager;
     std::unique_ptr<ECS::ComponentPoolRegistry> m_ComponentRegistry;

@@ -119,6 +119,7 @@ namespace ECS {
 			void* denseAddr = getAddress(denseIndex);
 			void* lastAddr = getAddress(last);
 
+			m_Info.destructor(denseAddr);
 			m_Info.moveConstructor(denseAddr, lastAddr);
 
 			EntityHandle movedEntity = m_Entities[last];

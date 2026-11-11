@@ -178,7 +178,7 @@ bool ScriptLoader::buildCompileCommandString(std::wstring& outCommand) {
 
 	cmd << L"/Fo\"" << buildDir.generic_wstring() << L"/\" ";
 
-	cmd << L"/link Engine.lib /DEBUG ";
+	cmd << L"/link Vesta.lib /DEBUG ";
 	cmd << L"/PDB:\"" << (buildDir / "scripts.pdb").generic_wstring() << L"\" ";
 	cmd << L"/out:\"" << (buildDir / "temp_scripts.dll").generic_wstring() << L"\"";
 

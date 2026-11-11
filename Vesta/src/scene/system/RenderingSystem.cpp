@@ -72,8 +72,8 @@ namespace RenderingSystem {
 			pointLightData.diffuseIntensity = pointLight.diffuseStrength;
 			pointLightData.specularIntensity = pointLight.specularStrength;
 			pointLightData.constant = pointLight.constant;
-			pointLightData.linear = pointLightData.linear;
-			pointLightData.quadratic = pointLightData.quadratic;
+			pointLightData.linear = pointLight.linear;
+			pointLightData.quadratic = pointLight.quadratic;
 
 			renderView.pointLightData.push_back(std::move(pointLightData));
 		}
