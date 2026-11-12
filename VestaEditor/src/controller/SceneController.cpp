@@ -1,5 +1,5 @@
 #include <controller/SceneController.h>
-#include <persistance/SceneSerializer.h>
+#include <persistence/SceneSerializer.h>
 
 #include <scene/Scene.h>
 #include <core/Application.h>

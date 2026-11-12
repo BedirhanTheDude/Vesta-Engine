@@ -9,7 +9,7 @@
 #include <scene/system/CameraSystem.h>
 
 #include <scene/components/ComponentFactory.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 REGISTER(CameraComponent);
 

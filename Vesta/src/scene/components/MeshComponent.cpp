@@ -7,7 +7,7 @@
 #include <scene/system/MeshSystem.h>
 
 #include <scene/components/ComponentFactory.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <renderer/Mesh.h>
 

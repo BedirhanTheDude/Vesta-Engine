@@ -3,7 +3,7 @@
 #include <scene/components/ComponentFactory.h>
 #include <property/Property.h>
 #include <property/PropertySerializer.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 void BehaviourComponent::serialize(Archive& arch) const {
     PropertySerializer::serialize(*(PropertyHolder*)this, arch);

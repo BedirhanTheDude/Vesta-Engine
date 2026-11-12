@@ -7,7 +7,7 @@
 #include <scene/components/Component.h>
 #include <scene/components/BehaviourComponent.h>
 #include <scene/components/ComponentFactory.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 #include <property/ComponentReflection.h>
 
 #include <cstdio>

@@ -1,6 +1,6 @@
 #include "ScriptCache.h"
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 #include <ecs/ComponentPoolRegistry.h>
 
 #include <scene/Scene.h>

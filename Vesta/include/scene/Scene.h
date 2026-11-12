@@ -66,7 +66,7 @@ public:
 
     PhysicsWorld& getPhysicsWorld();
 
-    ECS::ComponentPoolRegistry* getComponentPoolRegistry() const; // evil component pool registry type leakage >:D
+    ECS::ComponentPoolRegistry* getComponentPoolRegistry() const;
 
     bool isPlaying = false;
 private:

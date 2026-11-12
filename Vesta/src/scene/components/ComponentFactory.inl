@@ -2,7 +2,7 @@
 
 #include <scene/components/ComponentFactory.h>
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 #include <scene/Entity.h>
 
 #include <type_traits>
@@ -62,7 +62,7 @@ const Entry* findEntry(unsigned int UID, const std::unordered_map<std::string, E
     static_assert(std::is_same<Entry, ComponentFactory::BuiltInEntry>::value || std::is_same<Entry, ComponentFactory::ScriptEntry>::value,
         "Entry must be BuiltInEntry or ScriptEntry");
 
-    std::string name = __componentTypeUIDToString(UID);
+    std::string name = componentTypeUIDToStringRegistry(UID);
     if (name.empty()) return nullptr;
 
     auto sit = registry.find(name);

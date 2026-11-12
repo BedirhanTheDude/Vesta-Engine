@@ -1,6 +1,6 @@
 #include "DirectionalLightSystem.h"
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 namespace DirectionalLightSystem {
 

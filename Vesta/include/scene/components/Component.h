@@ -3,7 +3,7 @@
 #include <scene/Entity.h>
 #include <scene/components/ComponentTypeUID.h>
 
-#include <persistance/Serializable.h>
+#include <persistence/Serializable.h>
 
 class Component : ISerializable {
 public:

@@ -2,7 +2,7 @@
 
 #include "ComponentFactory.inl"
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 #include <scene/Entity.h>
 
 #include <unordered_map>
@@ -13,7 +13,7 @@ bool ComponentFactory::m_ScriptCacheValid = false;
 
 // single definition (this TU is compiled only into Engine.dll), so the UID->name map
 // is shared by every module that calls it: REGISTER/END_SCRIPT write it, the UI reads it.
-std::string __componentTypeUIDToString(unsigned int UID, bool set, const std::string& name) {
+std::string componentTypeUIDToStringRegistry(unsigned int UID, bool set, const std::string& name) {
     static std::unordered_map<unsigned int, std::string> nameMap;
     if (set) {
         nameMap[UID] = name;
@@ -122,7 +122,7 @@ const std::vector<std::string>& ComponentFactory::getScriptNames() {
 }
 
 const ScriptTypeInfo* ComponentFactory::getScriptTypeInfo(unsigned int UID) {
-    const std::string& name = __componentTypeUIDToString(UID);
+    const std::string& name = componentTypeUIDToStringRegistry(UID);
 
     auto& registry = getScriptRegistry();
     auto it = registry.find(name);

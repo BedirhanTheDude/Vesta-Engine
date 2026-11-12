@@ -2,7 +2,7 @@
 
 #include <scene/system/TransformSystem.h>
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 

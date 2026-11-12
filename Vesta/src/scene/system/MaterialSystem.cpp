@@ -1,7 +1,7 @@
 #include "MaterialSystem.h"
 
 #include <core/AssetManager.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <renderer/Material.h>
 #include <renderer/ShaderProgram.h>

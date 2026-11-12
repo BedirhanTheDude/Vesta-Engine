@@ -11,7 +11,7 @@
 #include <scene/components/TransformComponent.h>
 #include <scene/components/CameraComponent.h>
 #include <scene/components/ComponentFactory.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 #include <core/Project.h>
 
 static bool getSceneFilePath(const Scene& scene, bool temp, std::filesystem::path& outPath) {

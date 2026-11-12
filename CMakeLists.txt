@@ -87,9 +87,9 @@ set(PROPERTY_SRC
     Vesta/src/property/PropertySerializer.cpp
 )
 
-set(PERSISTANCE_SRC
-    Vesta/src/persistance/Archive.cpp
-    Vesta/src/persistance/SceneSerializer.cpp
+set(PERSISTENCE_SRC
+    Vesta/src/persistence/Archive.cpp
+    Vesta/src/persistence/SceneSerializer.cpp
 )
 
 set(SCRIPTING_SRC
@@ -147,7 +147,7 @@ set(IMGUI_SRC
 
 # Vesta.dll (whole engine in a single .dll)
 add_library(Vesta SHARED
-    ${PERSISTANCE_SRC}
+    ${PERSISTENCE_SRC}
     ${PROPERTY_SRC}
     ${CORE_SRC}
     ${ECS_SRC}
@@ -224,13 +224,13 @@ target_link_libraries(VestaEditor PRIVATE lunasvg)
 
 # Editor Resources
 file(COPY VestaEditor/resources DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY VestaRuntime/icon.png DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY VestaRuntime/resources/icon.png DESTINATION ${CMAKE_BINARY_DIR})
 
 add_executable(VestaRuntime VestaRuntime/main.cpp)
 
 if(WIN32)
-    target_sources(VestaRuntime PRIVATE VestaRuntime/resources.rc)
-    set_source_files_properties(VestaRuntime/resources.rc PROPERTIES
+    target_sources(VestaRuntime PRIVATE VestaRuntime/resources/resources.rc)
+    set_source_files_properties(VestaRuntime/resources/resources.rc PROPERTIES
         COMPILE_FLAGS "/I\"${CMAKE_CURRENT_SOURCE_DIR}/VestaRuntime\"")
 endif()
 

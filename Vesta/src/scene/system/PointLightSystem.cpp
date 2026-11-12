@@ -1,6 +1,6 @@
 #include "PointLightSystem.h"
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <glm/glm.hpp>
 

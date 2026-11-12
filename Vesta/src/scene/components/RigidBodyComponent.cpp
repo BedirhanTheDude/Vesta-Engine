@@ -1,6 +1,6 @@
 #include <scene/components/RigidBodyComponent.h>
 
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <scene/Entity.h>
 #include <scene/Scene.h>

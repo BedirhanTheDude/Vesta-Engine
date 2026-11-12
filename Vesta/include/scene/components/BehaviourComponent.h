@@ -2,7 +2,7 @@
 
 #include <scene/components/Component.h>
 
-#include <persistance/Serializable.h>
+#include <persistence/Serializable.h>
 #include <property/Property.h>
 #include <property/CallbackProperty.h>
 #include <property/Payload.h>

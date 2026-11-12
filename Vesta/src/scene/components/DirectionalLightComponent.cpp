@@ -10,7 +10,7 @@
 #include <scene/system/DirectionalLightSystem.h>
 
 #include <scene/components/ComponentFactory.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 REGISTER(DirectionalLightComponent);
 

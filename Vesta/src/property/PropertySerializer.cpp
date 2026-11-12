@@ -1,7 +1,7 @@
 #include <property/PropertySerializer.h>
 
 #include <glm/glm.hpp>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 namespace PropertySerializer {
     void serialize(const PropertyHolder& holder, Archive& arch) {

@@ -8,7 +8,7 @@
 // DO NOT CALL THIS YOURSELF
 // Defined out-of-line in ComponentFactory.cpp so the static name map lives in ONE
 // module (Engine.dll)
-std::string __componentTypeUIDToString(unsigned int UID, bool set = false, const std::string& name = "");
+std::string componentTypeUIDToStringRegistry(unsigned int UID, bool set = false, const std::string& name = "");
 
 template<typename T>
 struct ComponentTypeInfo {
@@ -31,7 +31,7 @@ unsigned int componentTypeUID() {
 }
 
 inline std::string componentTypeUIDToString(unsigned int UID) {
-	std::string name = __componentTypeUIDToString(UID);
+	std::string name = componentTypeUIDToStringRegistry(UID);
 	return name == "" ? "<unkown_component>" : name;
 }
 

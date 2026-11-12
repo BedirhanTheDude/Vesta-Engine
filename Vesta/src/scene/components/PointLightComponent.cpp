@@ -5,7 +5,7 @@
 #include <scene/system/PointLightSystem.h>
 
 #include <scene/components/ComponentFactory.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <glm/glm.hpp>
 

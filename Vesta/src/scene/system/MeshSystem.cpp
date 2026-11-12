@@ -1,7 +1,7 @@
 #include "MeshSystem.h"
 
 #include <core/AssetManager.h>
-#include <persistance/Archive.h>
+#include <persistence/Archive.h>
 
 #include <renderer/Mesh.h>
 #include <renderer/LoadedModel.h>
