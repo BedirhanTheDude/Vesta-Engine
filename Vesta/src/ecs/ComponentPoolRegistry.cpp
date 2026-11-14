@@ -32,6 +32,16 @@ namespace ECS {
 		m_ScriptPools.clear();
 	}
 
+	void ComponentPoolRegistry::setIsTicking(bool value) {
+		for (auto& [UID, pool] : m_ScriptPools)
+			pool.setIsTicking(value);
+	}
+
+	void ComponentPoolRegistry::processScriptQueues() {
+		for (auto& [UID, pool] : m_ScriptPools)
+			pool.processQueue();
+	}
+
 	void ComponentPoolRegistry::removeEntityComponents(const EntityHandle& handle) {
 		for (auto& [UID, pool] : m_Pools)
 			pool->remove(handle);

@@ -296,17 +296,21 @@ void Scene::pasteComponent(uint32_t entityId, const Archive& componentArchive) {
 	ECS::EntityHandle handle{ entityId, generation };
 	if (handle.isInvalid()) return;
 
-	Entity entity(const_cast<Scene*>(this), handle);
+	bool hasComponent = false;
 
 	uint32_t componentUID = componentNameToUID(typeName);
 	auto* pool = m_ComponentRegistry->getPool(componentUID);
-	if (!pool) // component wasn't built-in
-		pool = m_ComponentRegistry->getScriptPool(componentUID);
-
-	if (!pool) return;
-
-	bool hasComponent = pool->has(handle);
+	if (pool) { // component wasn't built-in
+		hasComponent = pool->has(handle);
+	}
+	else {
+		auto* spool = m_ComponentRegistry->getScriptPool(componentUID);
+		if (spool) hasComponent = spool->has(handle);
+		else return;
+	}
 	
+	Entity entity(const_cast<Scene*>(this), handle);
+
 	if (hasComponent)
 		ComponentFactory::fillExistingComponent(entity, componentArchive);
 	else
@@ -519,6 +523,8 @@ void Scene::tickBehaviours(float dt) {
 		m_BehaviourTickListPoolRecords.push_back({ UID, poolStart, poolEnd });
 	}
 
+	m_ComponentRegistry->setIsTicking(true);
+
 	for (const BehaviourTickListPoolRecord& poolRecord : m_BehaviourTickListPoolRecords)
 		for (size_t i = poolRecord.start; i < poolRecord.end; ++i) {
 			const BehaviourTickEntry& entry = m_BehaviourTickList[i];
@@ -544,6 +550,9 @@ void Scene::tickBehaviours(float dt) {
 			if (beh)
 				beh->onLateUpdate(dt);
 		}
+
+	m_ComponentRegistry->setIsTicking(false);
+	m_ComponentRegistry->processScriptQueues();
 }
 
 PhysicsWorld& Scene::getPhysicsWorld() { return *m_PhysicsWorld; }
@@ -598,16 +607,16 @@ BehaviourComponent* Scene::addBehaviour(const ECS::EntityHandle& handle, unsigne
 	auto* pool = m_ComponentRegistry->getOrCreateScriptPool(UID);
 	assert(pool);
 
-	pool->add(handle);
-	auto* behaviour = pool->getBehaviour(handle);
+	void* mem = pool->add(handle);
+	if (!mem) throw std::runtime_error("Failed to allocate script pool storage");
 
-	if (!behaviour)
-		throw std::runtime_error("Failed to allocate script pool storage");
+	BehaviourComponent* beh = pool->asBehaviour(mem);
+	if (beh) {
+		beh->entity = Entity(this, handle);
+		beh->m_TypeUID = UID;
+	}
 
-	behaviour->entity = Entity(this, handle);
-	behaviour->m_TypeUID = UID;
-
-	return behaviour;
+	return beh;
 }
 
 BehaviourComponent* Scene::getBehaviour(const ECS::EntityHandle& handle, unsigned int UID) const {

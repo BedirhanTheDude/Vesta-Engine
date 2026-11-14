@@ -30,6 +30,8 @@ namespace ECS {
 		ComponentPoolRegistry& operator=(const ComponentPoolRegistry&) = delete;
 
 		void reset();
+		void setIsTicking(bool value);
+		void processScriptQueues();
 		void removeEntityComponents(const EntityHandle& handle);
 
 		// Type-erased access to a built-in pool by its proxy's component type UID, nullptr if unknown.
