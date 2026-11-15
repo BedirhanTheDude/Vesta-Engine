@@ -24,15 +24,15 @@
 
 // DO NOT change order of this struct pls, memory alignment may break
 struct PointLightGPU {
-	glm::vec3 position;
-	glm::vec3 color;
-	float ambientIntensity;
-	float diffuseIntensity;
-	float specularIntensity;
-	float constant;
-	float linear;
-	float quadratic;
+    glm::vec3 position;  float ambientIntensity;
+    glm::vec3 color;     float diffuseIntensity;
+    float specularIntensity;
+    float constant;
+    float linear;
+    float quadratic;
 };
+static_assert(sizeof(PointLightGPU) == 48, "PointLightGPU must match the std430 PointLight layout");
+static_assert(offsetof(PointLightGPU, color) == 16, "vec3 members must start on 16-byte boundaries");
 
 static bool hasAnyTransparent(const MaterialData& materials) {
 	for (const auto& material : materials.materials) {

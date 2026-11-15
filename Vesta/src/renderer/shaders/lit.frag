@@ -9,10 +9,8 @@ struct DirectionalLight {
 };
 
 struct PointLight {
-    vec3 position;
-    vec3 color;
-    float ambientIntensity;
-    float diffuseIntensity;
+    vec3 position;  float ambientIntensity;
+    vec3 color;     float diffuseIntensity;
     float specularIntensity;
     float constant;
     float linear;
@@ -111,11 +109,7 @@ vec3 calculatePointLight(PointLight light, Material mat, vec3 normal, vec3 fragP
     vec3 halfwayDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(normal, halfwayDir), 0.0), mat.shininess);
     float distance = length(light.position - fragPos);
-    float attenuation = 1.0 / (
-        light.constant +
-        light.linear * distance +
-        light.quadratic * distance * distance
-        );
+    float attenuation = 1.0 / max(light.constant + light.linear * distance + light.quadratic * distance * distance, 1e-4);
 
     vec3 ambient = mat.ambientReflectance * light.ambientIntensity * albedo * light.color;
     vec3 diffuse = light.diffuseIntensity * diff * albedo * light.color;
