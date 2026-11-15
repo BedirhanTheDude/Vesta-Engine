@@ -30,7 +30,6 @@ _deps/
 # ---------------------------------------------------------------------------
 # Compiled binaries / object files
 # ---------------------------------------------------------------------------
-*.obj
 *.o
 *.lo
 *.slo
@@ -44,10 +43,15 @@ _deps/
 *.so
 *.dylib
 
-!dependencies/llvm/
+!dependencies/llvm/bin/*.exe
+!dependencies/physx/debug/*.lib
+!dependencies/physx/debug/*.dll
+!dependencies/physx/release/*.lib
+!dependencies/physx/release/*.dll
+
 
 # project cache (script build, mesh caches, temp scene)
-.vesta/
+!.vesta/*.vestaproj
 
 # editor state next to the exe
 editor.dat

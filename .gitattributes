@@ -1,2 +1,4 @@
 dependencies/llvm/bin/*.exe filter=lfs diff=lfs merge=lfs -text
 dependencies/physx/**/*.lib filter=lfs diff=lfs merge=lfs -text
+ExampleProject/models/bmw.obj filter=lfs diff=lfs merge=lfs -text
+ExampleProject/models/maxwell.obj filter=lfs diff=lfs merge=lfs -text
