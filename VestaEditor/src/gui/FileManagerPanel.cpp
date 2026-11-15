@@ -18,8 +18,46 @@ void FileManagerPanel::init(const std::filesystem::path& rootPath) {
     this->m_RootPath = rootPath;
     m_CurrentDir = this->m_RootPath;
 
+    initIcons();
     refresh();
     refreshScripts();
+}
+
+void FileManagerPanel::initIcons() {
+    const std::filesystem::path dir("resources/icons");
+
+    IconRegistry::IconId cpp      = m_Icons.registerIcon(dir / "cpp.svg");
+    IconRegistry::IconId folder   = m_Icons.registerIcon(dir / "folder.svg");
+    IconRegistry::IconId material = m_Icons.registerIcon(dir / "material.svg");
+    IconRegistry::IconId obj      = m_Icons.registerIcon(dir / "obj.svg");
+    IconRegistry::IconId scene    = m_Icons.registerIcon(dir / "scene.svg");
+    IconRegistry::IconId txt      = m_Icons.registerIcon(dir / "txt.svg");
+    IconRegistry::IconId unknown  = m_Icons.registerIcon(dir / "unknown.svg");
+
+    m_Icons.mapExtension(".h", cpp);
+    m_Icons.mapExtension(".cpp", cpp);
+    m_Icons.mapExtension(".mtl", material);
+    m_Icons.mapExtension(".obj", obj);
+    m_Icons.mapExtension(".vestascene", scene);
+    m_Icons.mapExtension(".txt", txt);
+    m_Icons.setDirectoryIcon(folder);
+    m_Icons.setFallbackIcon(unknown);
+}
+
+bool FileManagerPanel::iconButton(uint32_t texture, const char* fallbackLabel, bool selected) {
+    ImVec2 iconSize(m_ItemSize, m_ItemSize);
+    const ImVec4 clear(0.f, 0.f, 0.f, 0.f);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(0.26f, 0.59f, 0.98f, 0.35f) : clear);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, clear);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, clear);
+
+    bool clicked = texture != 0
+        ? ImGui::ImageButton("##btn", (ImTextureID)(intptr_t)texture, iconSize) // ID scoped by the caller's PushID
+        : ImGui::Button(fallbackLabel, iconSize);
+
+    ImGui::PopStyleColor(3);
+    return clicked;
 }
 
 void FileManagerPanel::refresh() {
@@ -47,6 +85,7 @@ void FileManagerPanel::refresh() {
         if (n.isDirectory && FileTypeController::isHiddenDirectory(n.path)) continue;
         if (!n.isDirectory && FileTypeController::isProjectFile(n.path)) continue;
 
+        n.icon = m_Icons.iconFor(n.path, n.isDirectory);
         m_CurrentItems.push_back(n);
     }
     std::sort(m_CurrentItems.begin(), m_CurrentItems.end(),
@@ -157,6 +196,7 @@ void FileManagerPanel::refreshScripts() {
         n.path = entry.path();
         n.name = entry.path().filename().string();
         n.isDirectory = false;
+        n.icon = m_Icons.iconFor(n.path, false);
         m_ScriptItems.push_back(n);
 
         if (extension == ".h")
@@ -183,21 +223,12 @@ void FileManagerPanel::drawScriptsTab() {
     int columns = std::max(1, static_cast<int>(panelWidth / (m_ItemSize + 16.0f)));
     ImGui::Columns(columns, "##scriptgrid", false);
 
-    ImVec2 iconSize(m_ItemSize, m_ItemSize);
-    std::filesystem::path scrollPath("resources/images/script.svg");
-
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.f, 0.f, 0.f, 0.f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.f, 0.f, 0.f, 0.f));
+    const uint32_t iconPixels = static_cast<uint32_t>(m_ItemSize);
 
     for (auto& node : m_ScriptItems) {
         ImGui::PushID(node.path.u8string().c_str());
 
-        uint32_t thumb = Thumbnail::loadThumbnailFromSvg(scrollPath, m_ItemSize, m_ItemSize);
-        if (thumb != UINT_MAX)
-            ImGui::ImageButton("##btn", (ImTextureID)(intptr_t)thumb, iconSize);
-        else
-            ImGui::Button("[SCR]", iconSize);
+        iconButton(m_Icons.getTexture(node.icon, iconPixels), "[SCR]", m_SelectedPath == node.path);
 
         if (ImGui::IsItemClicked()) m_SelectedPath = node.path;
 
@@ -236,8 +267,6 @@ void FileManagerPanel::drawScriptsTab() {
         ImGui::PopID();
         ImGui::NextColumn();
     }
-
-    ImGui::PopStyleColor(3);
 
     ImGui::Columns(1);
 }
@@ -492,35 +521,14 @@ void FileManagerPanel::drawItem(FileNode& node) {
         return;
     }
 
-    ImVec2 iconSize(m_ItemSize, m_ItemSize);
+    // images preview themselves, everything else (and images that failed to load) gets its svg icon
+    uint32_t texture = 0;
+    if (FileTypeController::isImageFile(node.path))
+        texture = Thumbnail::loadThumbnailFromImage(node.path); // 0 on failure
+    if (texture == 0)
+        texture = m_Icons.getTexture(node.icon, static_cast<uint32_t>(m_ItemSize));
 
-    if (selected) {
-        ImVec4 selColor(0.26f, 0.59f, 0.98f, 0.35f);
-        ImGui::PushStyleColor(ImGuiCol_Button, selColor);
-    }
-
-    bool clicked = false;
-    if (FileTypeController::isImageFile(node.path)) {
-        uint32_t thumb = Thumbnail::loadThumbnailFromImage(node.path);
-        if (thumb != UINT_MAX) {
-            clicked = ImGui::ImageButton(
-                ("##btn" + node.path.string()).c_str(),
-                (ImTextureID)(intptr_t)thumb,
-                iconSize);
-        }
-        else {
-            clicked = ImGui::Button(
-                FileTypeController::iconForExtension(node.path, node.isDirectory),
-                iconSize);
-        }
-    }
-    else {
-        clicked = ImGui::Button(
-            FileTypeController::iconForExtension(node.path, node.isDirectory),
-            iconSize);
-    }
-
-    if (selected) ImGui::PopStyleColor();
+    bool clicked = iconButton(texture, FileTypeController::iconForExtension(node.path, node.isDirectory), selected);
 
     if (clicked || ImGui::IsItemClicked()) {
         m_SelectedPath = node.path;

@@ -12,7 +12,7 @@
 
 static std::unordered_map<uint32_t, unsigned int> _thumbnailCache;
 
-static uint32_t _loadThumbnail(const uint8_t* data, uint32_t width, uint32_t height) {
+static uint32_t loadThumbnail(const uint8_t* data, uint32_t width, uint32_t height) {
     uint32_t texId = 0;
     glGenTextures(1, &texId);
     glBindTexture(GL_TEXTURE_2D, texId);
@@ -24,7 +24,7 @@ static uint32_t _loadThumbnail(const uint8_t* data, uint32_t width, uint32_t hei
     return texId;
 }
 
-static bool _tryGetFromCache(uint32_t key, uint32_t* outTexId) {
+static bool tryGetFromCache(uint32_t key, uint32_t* outTexId) {
     auto it = _thumbnailCache.find(key);
     if (it != _thumbnailCache.end()) {
         *outTexId = it->second;
@@ -41,14 +41,14 @@ uint32_t Thumbnail::loadThumbnailFromImage(const std::filesystem::path& imagePat
     uint32_t key = Hash::hashString(cStr);
 
     uint32_t texId = 0;
-    if (_tryGetFromCache(key, &texId)) return texId;
+    if (tryGetFromCache(key, &texId)) return texId;
 
     int w, h, ch;
     stbi_set_flip_vertically_on_load(false);
     uint8_t* data = stbi_load(cStr, &w, &h, &ch, 4);
     if (!data) return 0;
 
-    texId = _loadThumbnail(data, w, h);
+    texId = loadThumbnail(data, w, h);
 
     stbi_image_free(data);
     _thumbnailCache[key] = texId;
@@ -64,11 +64,13 @@ uint32_t Thumbnail::loadThumbnailFromSvg(const std::filesystem::path& svgPath, u
     key = Hash::hashBytes(&targetHeight, sizeof(targetHeight), key);
 
     uint32_t texId = 0;
-    if (_tryGetFromCache(key, &texId)) return texId;
+    if (tryGetFromCache(key, &texId)) return texId;
 
     SvgPixels::Pixels svgPixels = SvgPixels::loadPixels(pathStr, targetWidth, targetHeight);
-    
-    texId = _loadThumbnail(svgPixels.data.data(), svgPixels.width, svgPixels.height);
+    if (svgPixels.data.empty() || svgPixels.width == 0 || svgPixels.height == 0)
+        return 0;
+
+    texId = loadThumbnail(svgPixels.data.data(), svgPixels.width, svgPixels.height);
 
     svgPixels.data.clear();
     _thumbnailCache[key] = texId;

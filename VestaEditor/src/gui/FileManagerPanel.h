@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gui/IconRegistry.h>
+
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -11,6 +13,7 @@ struct FileNode {
     bool isDirectory = false;
     std::vector<std::shared_ptr<FileNode>> children;
     unsigned int previewTexture = 0;
+    IconRegistry::IconId icon = IconRegistry::INVALID_ICON;
 };
 
 class FileManagerPanel {
@@ -35,6 +38,12 @@ private:
 
     void refresh();
     FileNode buildTree(const std::filesystem::path& path, int depth = 0) const;
+
+    void initIcons();
+    // borderless icon button, texture 0 falls back to a text button with fallbackLabel
+    bool iconButton(uint32_t texture, const char* fallbackLabel, bool selected = false);
+
+    IconRegistry m_Icons;
 
     void createFolder(const std::filesystem::path& parent, const std::string& name);
     void renameItem(FileNode& node, const std::string& newName);

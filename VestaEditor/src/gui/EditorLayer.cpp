@@ -1,6 +1,7 @@
 #include "EditorLayer.h"
 
 #include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 #include <imguizmo/src/ImGuizmo.h>
 
 #include <core/Input.h>
@@ -23,6 +24,38 @@
 #include <cstdint>
 #include <vector>
 #include <map>
+
+// for string fields in inspector
+static int stringResizeCallback(ImGuiInputTextCallbackData* data) {
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+        auto* str = static_cast<std::string*>(data->UserData);
+        str->resize(data->BufTextLen);
+        data->Buf = str->data();
+    }
+    return 0;
+}
+
+static void buildDefaultDockLayout(ImGuiID dockspaceID, const ImVec2& size) {
+    ImGui::DockBuilderRemoveNode(dockspaceID);
+    ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspaceID, size);
+
+    ImGuiID center = dockspaceID;
+    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.18f, nullptr, &center);
+    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.27f, nullptr, &center);
+    ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.30f, nullptr, &center);
+    ImGuiID topRight = ImGui::DockBuilderSplitNode(right, ImGuiDir_Up, 0.13f, nullptr, &right);
+
+    ImGui::DockBuilderDockWindow("Hierarchy", left);
+    ImGui::DockBuilderDockWindow("Stats", topRight);
+    ImGui::DockBuilderDockWindow("Inspector", right);
+    ImGui::DockBuilderDockWindow("Scene", center);
+    ImGui::DockBuilderDockWindow("Game", center);
+    ImGui::DockBuilderDockWindow("File Manager", bottom);
+    ImGui::DockBuilderDockWindow("Console", bottom);
+
+    ImGui::DockBuilderFinish(dockspaceID);
+}
 
 void EditorLayer::Init(std::function<void()> onExit) {
     this->onExit = onExit;
@@ -80,6 +113,10 @@ void EditorLayer::ShowDockspace() {
     ImGui::PopStyleVar(2);
 
     ImGuiID dockspaceID = ImGui::GetID("MyDockSpace");
+
+    if (ImGui::DockBuilderGetNode(dockspaceID) == nullptr)
+        buildDefaultDockLayout(dockspaceID, viewport->WorkSize);
+
     ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
     ImGui::End();
@@ -367,6 +404,12 @@ void EditorLayer::ShowInspectorPanel() {
                     changed = true;
                 }
             }
+            break;
+        }
+        case PropertyType::String: {
+            auto* str = static_cast<std::string*>(prop.ptr);
+            changed = ImGui::InputText(propName.c_str(), str->data(), str->capacity() + 1,
+                ImGuiInputTextFlags_CallbackResize, stringResizeCallback, str);
             break;
         }
         default:

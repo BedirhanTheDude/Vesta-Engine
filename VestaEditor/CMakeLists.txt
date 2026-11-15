@@ -9,6 +9,7 @@ set(GUI_SRC
     src/gui/EditorLayer.cpp
     src/gui/FileManagerPanel.cpp
     src/gui/HierarchyPanel.cpp
+    src/gui/IconRegistry.cpp
     src/gui/ImGuiLayer.cpp
     src/gui/Thumbnail.cpp
     src/gui/SvgPixels.cpp
