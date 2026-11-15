@@ -245,8 +245,23 @@ The build copies everything the editor needs next to `VestaRuntime.exe`: the scr
 | `Flock`, `Contagion` | Many interacting entities |
 | `Director` | Orchestrating the other demos |
 
-[![Video of Demo Scene Running](docs/media/thumbnail.png)](https://www.youtube.com/watch?v=m5kBnAPgg8o)
+### Controls
+
+| Key | Action |
+|---|---|
+| C | Switch between the cinematic orbit (the starting mode) and free flight |
+| Right mouse + WASD, Q/E, Shift | Fly the camera |
+| F / Left mouse | Fire a cannonball |
+| X | Fire an explosive charge |
+| I | Infect a random body |
+| R | Rebuild the tower |
+| G | Toggle the cube rain |
+| L | Fire a firework salvo |
+| N | Pause the sun |
+| [ / ] | Slow down / speed up the day |
+
 **[Video of Demo Scene Running](https://www.youtube.com/watch?v=m5kBnAPgg8o)**
+[![Video of Demo Scene Running](docs/media/thumbnail.png)](https://www.youtube.com/watch?v=m5kBnAPgg8o)
 
 ---
 
