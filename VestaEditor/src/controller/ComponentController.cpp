@@ -176,9 +176,6 @@ const std::vector<CallbackPropertyGroup>& ComponentController::getComponentCallb
 	if (ReflectedComponent* reflected = getReflection(entity, componentUID))
 		return reflected->getCallbackPropertyGroups();
 
-	if (BehaviourComponent* behaviour = entity.getBehaviour(componentUID))
-		return behaviour->getCallbackPropertyGroups();
-
 	return empty;
 }
 

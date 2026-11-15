@@ -166,6 +166,7 @@ void EditorLayer::ShowMenuBar() {
             ImGui::MenuItem("Console", nullptr, &m_ShowConsole);
             ImGui::MenuItem("Scene", nullptr, &m_ShowScene);
             ImGui::MenuItem("Game", nullptr, &m_ShowGame);
+            ImGui::MenuItem("File Manager", nullptr, &m_ShowFileManager);
             ImGui::EndMenu();
         }
 
