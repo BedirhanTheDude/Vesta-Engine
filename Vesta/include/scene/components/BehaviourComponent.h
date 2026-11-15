@@ -10,11 +10,13 @@
 
 class Scene;
 class Archive;
+class ScriptCache;
 
 // Base class for user-level scripts
 class BehaviourComponent : public Component, public PropertyHolder, public PayloadHolder {
 public:
     friend class Scene;
+    friend class ScriptCache;
 
     BehaviourComponent() = default;
     BehaviourComponent(BehaviourComponent&&) noexcept = default;

@@ -15,10 +15,12 @@ static const void* rebasePtr(const void* p, std::uintptr_t oldBase, std::uintptr
 
 void BehaviourComponent::serialize(Archive& arch) const {
     PropertySerializer::serialize(*(PropertyHolder*)this, arch);
+    arch.set("_scriptStarted_", m_Started);
 }
 
 void BehaviourComponent::deserialize(const Archive& arch) {
     PropertySerializer::deserialize(*(PropertyHolder*)this, arch);
+    arch.get("_scriptStarted_", m_Started);
 }
 
 void BehaviourComponent::rebaseInternalPointers(const void* oldBase, const void* newBase, size_t size) noexcept {
