@@ -135,11 +135,12 @@ namespace ECS {
 
 		size_t last = m_Used - 1;
 
+		void* denseAddr = getAddress(m_Buffer, denseIndex);
+		m_Info.destructor(denseAddr);
+
 		if (denseIndex != last) {
-			void* denseAddr = getAddress(m_Buffer, denseIndex);
 			void* lastAddr = getAddress(m_Buffer, last);
 
-			m_Info.destructor(denseAddr);
 			m_Info.moveConstructor(denseAddr, lastAddr);
 
 			EntityHandle movedEntity = m_Entities[last];

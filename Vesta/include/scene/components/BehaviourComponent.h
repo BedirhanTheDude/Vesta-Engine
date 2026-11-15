@@ -12,8 +12,7 @@ class Scene;
 class Archive;
 
 // Base class for user-level scripts
-class BehaviourComponent : public Component, public PropertyHolder,
-    public CallbackPropertyHolder, public PayloadHolder {
+class BehaviourComponent : public Component, public PropertyHolder, public PayloadHolder {
 public:
     friend class Scene;
 
@@ -33,6 +32,8 @@ public:
     void deserialize(const Archive& arch) override;
 
     unsigned int getTypeUID() const { return m_TypeUID; }
+
+    void rebaseInternalPointers(const void* oldBase, const void* newBase, size_t size) noexcept;
 
 private:
     void tick(float dt) {

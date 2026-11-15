@@ -25,7 +25,7 @@ struct ScriptTypeInfo {
 
 template<typename T>
 ScriptTypeInfo makeTypeInfo() {
-
+    static_assert(std::is_base_of_v <BehaviourComponent, T>, "Script must inherit from BehaviourComponent");
     static_assert(
         std::is_nothrow_move_constructible_v<T>,
         "Script types must have noexcept move constructors"
@@ -45,7 +45,8 @@ ScriptTypeInfo makeTypeInfo() {
 
         [](void* dst, void* src) noexcept {
             T* source = static_cast<T*>(src);
-            new (dst) T(std::move(*source));
+            T* moved = new (dst) T(std::move(*source));
+            static_cast<BehaviourComponent*>(moved)->rebaseInternalPointers(src, dst, sizeof(T));
             source->~T();
         },
 
