@@ -51,7 +51,7 @@ _deps/
 
 
 # project cache (script build, mesh caches, temp scene)
-.vesta/
+!.vesta/*.vestaproj
 
 # editor state next to the exe
 editor.dat
