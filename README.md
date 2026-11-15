@@ -49,6 +49,9 @@
 - Built-in primitives (box, sphere, plane)
 
 <!-- lighting video -->
+https://github.com/user-attachments/assets/493d158f-249c-4294-96b2-53559785c025
+
+
 
 ### Physics (NVIDIA PhysX 5)
 - Static, dynamic and kinematic rigid bodies
@@ -99,6 +102,11 @@ Development is almost uninterrupted however, because compiling scripts doesn't r
 that can cause problems depending on your scene structure and script logic.
 
 <!-- script compiling video -->
+
+
+https://github.com/user-attachments/assets/eff945e9-9f06-4108-85bf-0749eba2f860
+
+
 
 Lifecycle hooks: `onAttach`, `onStart`, `onUpdate`, `onLateUpdate`, `onDetach`.
 
@@ -203,7 +211,7 @@ cmake --preset x64-release
 cmake --build out/build/x64-release
 ```
 
-Or open the folder in Visual Studio and pick the `x64 Debug` / `x64 Release` preset.
+Or open the folder in Visual Studio and pick the `x64 Debug` / `x64 Release` preset. You can also use any other IDE that has a CMake extension.
 
 The build copies everything the editor needs next to `VestaRuntime.exe`: the script compiler, the engine headers and the import library.
 
